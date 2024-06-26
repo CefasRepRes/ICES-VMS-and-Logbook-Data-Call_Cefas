@@ -66,7 +66,7 @@ dir.create(plotPath, showWarnings = T)
 
 # Setting thresholds
 spThres       <- 20   # Maximum speed threshold in analyses in nm
-intThres      <- 5    # Minimum difference in time interval in minutes to prevent pseudo duplicates
+intThres      <- 3    # Minimum difference in time interval in minutes to prevent pseudo duplicates
 intvThres     <- 240  # Maximum difference in time interval in minutes to prevent unrealistic intervals
 lanThres      <- 1.5  # Maximum difference in log10-transformed sorted weights
 

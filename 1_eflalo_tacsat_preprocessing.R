@@ -29,24 +29,33 @@ harbours_alt <-
 
 
 
+#### MIKE: Try initially only with 2023 data 
+
+year = 2023
+
 # Looping through the years to submit
 for(year in yearsToSubmit){
   print(paste0("Start loop for year ",year))
   #'----------------------------------------------------------------------------
   # 1.1 load TACSAT and EFLALO data from file                               ----
   #'----------------------------------------------------------------------------
-  tacsat_name <-
-    load(
-      file.path(
-        dataPath,
-        paste0("tacsat_", year, ".RData")
-      )); #- data is saved as tacsat_2009, tacsat_2010 etc
-  eflalo_name <-
-    load(
-      file.path(
-        dataPath,
-        paste0("eflalo_", year, ".RData")
-      )); #- data is saved as eflalo_2009, eflalo_2010 etc
+  # tacsat_name <-
+  #   load(
+  #     file.path(
+  #       dataPath,
+  #       paste0("tacsat_", year, ".RData")
+  #     )); #- data is saved as tacsat_2009, tacsat_2010 etc
+  # eflalo_name <-
+  #   load(
+  #     file.path(
+  #       dataPath,
+  #       paste0("eflalo_", year, ".RData")
+  #     )); #- data is saved as eflalo_2009, eflalo_2010 etc
+  
+  
+  ## MIKE: Load the data form GeoFISH source. Do not LOAD as SF , only as plain text 
+  ## ONLY VESSELS >= 12 meters
+  
   
   tacsat <- data.frame(get(tacsat_name)) # rename to tacsat
   eflalo <- data.frame(get(eflalo_name)) # rename to eflalo
@@ -54,6 +63,8 @@ for(year in yearsToSubmit){
   #- Make sure data is in right format
   tacsat <- formatTacsat(tacsat)
   eflalo <- formatEflalo(eflalo)
+  
+  ### IF TOO MUCH ISSUES , MOVE ON.
   
   #'----------------------------------------------------------------------------
   # 1.2 Clean the TACSAT data                                               ----
@@ -72,32 +83,32 @@ for(year in yearsToSubmit){
   remrecsTacsat["total", ] <- c(nrow(tacsat), "100%")
   
   # 1.2.1 Remove VMS pings outside the ICES areas ------------------------------
-  # Transform ICESareas and tacsat to sf objects
-  ia <- transform_to_sf(ICESareas, coords = c("SI_LONG", "SI_LATI"))
-  
-  # Transform tacsat to an sf object
-  tacsat <- transform_to_sf(tacsat, coords = c("SI_LONG", "SI_LATI"))
-  
-  # Make ia valid and transform it
-  ia <- ia %>%
-    sf::st_make_valid() %>%
-    sf::st_transform(4326) |> 
-    sf::st_zm()
-  
-  # Find intersections
-  overs <- sf::st_intersects(tacsat, ia)
-  
-  # See what points fall out the ICES area
-  tacsatx <- tacsat[!(lengths(overs) > 0),]
-  
+  # # Transform ICESareas and tacsat to sf objects
+  # ia <- transform_to_sf(ICESareas, coords = c("SI_LONG", "SI_LATI"))
+  # 
+  # # Transform tacsat to an sf object
+  # tacsat <- transform_to_sf(tacsat, coords = c("SI_LONG", "SI_LATI"))
+  # 
+  # # Make ia valid and transform it
+  # ia <- ia %>%
+  #   sf::st_make_valid() %>%
+  #   sf::st_transform(4326) |> 
+  #   sf::st_zm()
+  # 
+  # # Find intersections
+  # overs <- sf::st_intersects(tacsat, ia)
+  # 
+  # # See what points fall out the ICES area
+  # tacsatx <- tacsat[!(lengths(overs) > 0),]
+  # 
   # Filter tacsat
-  tacsat <- tacsat[lengths(overs) > 0,]
-  
-  # Calculate the percentage of remaining records 
-  percentage_remaining <- round(nrow(tacsat)/as.numeric(remrecsTacsat["total",1])*100,2)
-  
-  # Update remrecsTacsat
-  remrecsTacsat["outsideICESarea",] <- c(nrow(tacsat), percentage_remaining)
+  # tacsat <- tacsat[lengths(overs) > 0,]
+  # 
+  # # Calculate the percentage of remaining records 
+  # percentage_remaining <- round(nrow(tacsat)/as.numeric(remrecsTacsat["total",1])*100,2)
+  # 
+  # # Update remrecsTacsat
+  # remrecsTacsat["outsideICESarea",] <- c(nrow(tacsat), percentage_remaining)
   
   # 1.2.2 Remove duplicate records ---------------------------------------------
   
@@ -120,7 +131,7 @@ for(year in yearsToSubmit){
   # 1.2.3 Remove points that have impossible coordinates -----------------------
   
   # Extract coordinates from tacsat
-  coords <- st_coordinates(tacsat)
+  coords <- tacsat |>  select ( SI_LONG, SI_LATI )
   
   # Check for impossible positions
   invalid_positions <- which(coords[,2] > 90 | coords[,2] < -90 | coords[,1] > 180 | coords[,1] < -180)
@@ -140,14 +151,24 @@ for(year in yearsToSubmit){
   # Update remrecsTacsat
   remrecsTacsat["notPossible",] <- c(nrow(tacsat), percentage_remaining)
   
+  
+  
+  
   # 1.2.4 Remove points which are pseudo duplicates as they have an interval rate < x minutes ------------------
   
   # Sort tacsat and calculate intervals
-  tacsat <- sfsortTacsat(tacsat)
-  tacsat$INTV <- intervalTacsat(as.data.frame(tacsat), level = "vessel", fill.na = TRUE)$INTV
+  
+  ##======= CEFAS calculate INTERVALS in GEOFISH DATABASE 
+  
+  #tacsat <- sfsortTacsat(tacsat)
+  #tacsat$INTV <- intervalTacsat(as.data.frame(tacsat), level = "vessel", fill.na = TRUE)$INTV
   
   # Remove rows with small intervals
-  tacsat <- tacsat[tacsat$INTV >= intThres, ]
+  
+  tacsat$intv_mins = tacsat$INTV  * 60 ##convert the INTERVAL in minutes 
+  tacsat <- tacsat[tacsat$intv_mins >= intThres, ] ## Get only records larger than thershold defined in GLOBAL0.R
+  
+
   
   # Calculate the percentage of remaining records
   percentage_remaining <- round((nrow(tacsat) / as.numeric(remrecsTacsat["total", 1])) * 100, 2)
@@ -155,27 +176,27 @@ for(year in yearsToSubmit){
   # Update remrecsTacsat
   remrecsTacsat["pseudoDuplicates",] <- c(nrow(tacsat), percentage_remaining)
   
-  # Remove INTV column from tacsat
-  tacsat$INTV <- NULL
+  # Remove intv_mins column from tacsat
+  tacsat$intv_mins  = NULL ##delete the temporary field created
   
   
   
   # 1.2.5 Remove points in harbour ---------------------------------------------
   
-  # Find intersections
-  overs <- sf::st_intersects(tacsat, harbours_alt)
-  
-  # See what points fall out the ICES area
-  tacsatx <- tacsat[lengths(overs) > 0,]
-  
-  # Filter tacsat
-  tacsat <- tacsat[!(lengths(overs) > 0),]
-  
-  # Calculate the percentage of remaining records 
-  percentage_remaining <- round(nrow(tacsat)/as.numeric(remrecsTacsat["total",1])*100,2)
-  
-  # Update remrecsTacsat
-  remrecsTacsat["harbour",] <- c(nrow(tacsat), percentage_remaining)
+  # # Find intersections
+  # overs <- sf::st_intersects(tacsat, harbours_alt)
+  # 
+  # # See what points fall out the ICES area
+  # tacsatx <- tacsat[lengths(overs) > 0,]
+  # 
+  # # Filter tacsat
+  # tacsat <- tacsat[!(lengths(overs) > 0),]
+  # 
+  # # Calculate the percentage of remaining records 
+  # percentage_remaining <- round(nrow(tacsat)/as.numeric(remrecsTacsat["total",1])*100,2)
+  # 
+  # # Update remrecsTacsat
+  # remrecsTacsat["harbour",] <- c(nrow(tacsat), percentage_remaining)
   
   #  Save the remrecsTacsat file
   save(
