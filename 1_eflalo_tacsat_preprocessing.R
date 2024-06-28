@@ -1,3 +1,11 @@
+library(vmstools)
+library(lubridate)
+library(doBy)
+library(data.table)
+library(icesVocab)
+
+# source("C:\\Users\\MD09\\Documents\\git\\ICES-VMS-and-Logbook-Data-Call_Cefas\\0_global.R")
+
 #'------------------------------------------------------------------------------
 #
 # Script to extract and process VMS and logbook data for ICES VMS data call
@@ -10,21 +18,21 @@
 #'------------------------------------------------------------------------------
 # Load the data underlying VMStools    
 # data(euharbours); if(substr(R.Version()$os,1,3)== "lin")
-data(harbours)
-data(ICESareas)
-
-harbours_alt <- 
-  harbours |> 
-  # Convert spelling to ISO
-  dplyr::mutate(harbour = iconv(harbour, from = "latin1", to = "UTF-8")) |> 
-  as_tibble() |> 
-  sf::st_as_sf(coords = c("lon", "lat"),
-               crs = 4326) |> 
-  sf::st_transform(crs = 3857) |> 
-  # the range in harbour is always 3 km
-  sf::st_buffer(dist = 3000) |> 
-  sf::st_transform(crs = 4326) |> 
-  dplyr::select(harbour)
+# data(harbours)
+# data(ICESareas)
+# 
+# harbours_alt <- 
+#   harbours |> 
+#   # Convert spelling to ISO
+#   dplyr::mutate(harbour = iconv(harbour, from = "latin1", to = "UTF-8")) |> 
+#   as_tibble() |> 
+#   sf::st_as_sf(coords = c("lon", "lat"),
+#                crs = 4326) |> 
+#   sf::st_transform(crs = 3857) |> 
+#   # the range in harbour is always 3 km
+#   sf::st_buffer(dist = 3000) |> 
+#   sf::st_transform(crs = 4326) |> 
+#   dplyr::select(harbour)
 
 
 
@@ -53,12 +61,10 @@ for(year in yearsToSubmit){
   #     )); #- data is saved as eflalo_2009, eflalo_2010 etc
   
   
-  ## MIKE: Load the data form GeoFISH source. Do not LOAD as SF , only as plain text 
+  ## MIKE: Load the data form GeoFISH source. Do not LOAD as SF, only as plain text 
   ## ONLY VESSELS >= 12 meters
-  
-  
-  tacsat <- data.frame(get(tacsat_name)) # rename to tacsat
-  eflalo <- data.frame(get(eflalo_name)) # rename to eflalo
+  # tacsat <- data.frame(get(tacsat_name)) # rename to tacsat
+  # eflalo <- data.frame(get(eflalo_name)) # rename to eflalo
   
   #- Make sure data is in right format
   tacsat <- formatTacsat(tacsat)
@@ -112,8 +118,11 @@ for(year in yearsToSubmit){
   
   # 1.2.2 Remove duplicate records ---------------------------------------------
   
+  tacsat_bk <- tacsat
+  
   # Convert SI_DATE and SI_TIME to POSIXct
-  tacsat$SI_DATIM <- as.POSIXct(paste(tacsat$SI_DATE, tacsat$SI_TIME), tz = "GMT", format = "%d/%m/%Y  %H:%M")
+  # tacsat$SI_DATIM <- as.POSIXct(paste(tacsat$SI_DATE, tacsat$SI_TIME), tz = "GMT", format = "%d/%m/%Y  %H:%M")
+  # tacsat$SI_DATIM = ymd_hms(paste(tacsat$SI_DATE ,tacsat$SI_TIME), tz = "GMT")
   
   # Create a unique identifier for each row
   tacsat$unique_id <- paste(tacsat$VE_REF, tacsat$SI_LATI, tacsat$SI_LONG, tacsat$SI_DATIM)
@@ -131,7 +140,7 @@ for(year in yearsToSubmit){
   # 1.2.3 Remove points that have impossible coordinates -----------------------
   
   # Extract coordinates from tacsat
-  coords <- tacsat |>  select ( SI_LONG, SI_LATI )
+  coords <- tacsat |> dplyr::select ( SI_LONG, SI_LATI )
   
   # Check for impossible positions
   invalid_positions <- which(coords[,2] > 90 | coords[,2] < -90 | coords[,1] > 180 | coords[,1] < -180)
@@ -204,7 +213,7 @@ for(year in yearsToSubmit){
     file = file.path(outPath, paste0("remrecsTacsat", year, ".RData"))
   )
   tacsat <- as.data.frame(tacsat)
-  tacsat <- tacsat %>% dplyr::select(-geometry)
+  # tacsat <- tacsat %>% dplyr::select(-geometry)
   tacsat <- tacsat %>% dplyr::select(-unique_id)
   #  Save the cleaned tacsat file
   
@@ -263,7 +272,7 @@ for(year in yearsToSubmit){
   # 
   # 
   # 1.3.3 Remove non-unique trip numbers --------------------------------------
-  
+  eflalo_bk <- eflalo
   # Apply the trip ID function to the eflalo data frame
   trip_id <- create_trip_id(eflalo)
   
@@ -280,12 +289,15 @@ for(year in yearsToSubmit){
   # 1.3.4 Remove impossible time stamp records ---------------------------------
   
   # Apply the convert to date-time function to the FT_DDAT and FT_DTIME columns
-  eflalo$FT_DDATIM <- convert_to_datetime(eflalo$FT_DDAT, eflalo$FT_DTIME)
+  # eflalo$FT_DDATIM <- convert_to_datetime(eflalo$FT_DDAT, eflalo$FT_DTIME)
+  # eflalo$FT_DDATIM = ymd_hms(paste(eflalo$FT_DDAT, eflalo$FT_DTIME), tz = "GMT")
   # Apply the function to the FT_LDAT and FT_LTIME columns
-  eflalo$FT_LDATIM <- convert_to_datetime(eflalo$FT_LDAT, eflalo$FT_LTIME)
+  # eflalo$FT_LDATIM <- convert_to_datetime(eflalo$FT_LDAT, eflalo$FT_LTIME)
+  # eflalo$FT_LDATIM = ymd_hms(paste(eflalo$FT_LDAT, eflalo$FT_LTIME), tz = "GMT") 
   
   # Remove records with NA in either FT_DDATIM or FT_LDATIM
   eflalo <- eflalo[!is.na(eflalo$FT_DDATIM) & !is.na(eflalo$FT_LDATIM), ]
+  
   
   # Calculate the number of remaining records and the percentage of records removed
   num_records <- nrow(eflalo)
@@ -295,7 +307,7 @@ for(year in yearsToSubmit){
   remrecsEflalo["impossible time", ] <- c(num_records, 100 + percent_removed)
   
   # 1.3.5 Remove trip starting before 1st Jan ----------------------------------
-  
+  eflalo_bk <- eflalo
   # Call the remove before january function with the appropriate arguments
   eflalo <- remove_before_jan(eflalo, year)
   
@@ -348,7 +360,7 @@ for(year in yearsToSubmit){
   
   eflalo <- data.frame(eflalo2)
   
-  eflalo <- eflalo %>% select(-ref)
+  eflalo <- eflalo %>% dplyr::select(-ref)
   
   # Create a data table 'dt1' with the necessary columns from 'eflalo'
   dt1 <- data.table(ID = eflalo$VE_REF, FT = eflalo$FT_REF,
@@ -397,24 +409,24 @@ for(year in yearsToSubmit){
   
   ### 1.4.1 Check Metier L4 (Gear) categories are accepted -----------------------
   
-  m4_ices         <-  getCodeList("GearType")
-  table ( eflalo$LE_GEAR %in%m4_ices$Key )   # TRUE records accepted in DATSU, FALSE aren't
-  
-  # Get summary  of   DATSU valid/not valid records
-  eflalo [ ! eflalo$LE_GEAR %in%m4_ices$Key,]%>%group_by(LE_GEAR)%>%dplyr::select(LE_GEAR)%>%tally()
-  
-  # Correct or dismiss not valid records (if any) and filter only valid ones
-  
-  eflalo      <-  eflalo%>%filter(LE_GEAR %in% m4_ices$Key)
-  
-  
-  # Calculate the number of remaining records and the percentage of records removed
-  num_records <- nrow(eflalo)
-  percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
-  
-  
-  # Add to remrecsEflalo
-  remrecsEflalo["MetierL4_LE_GEAR",] <- c(nrow(eflalo), nrow(eflalo)/as.numeric(remrecsEflalo["Total","RowsRemaining"])*100)
+  # m4_ices         <-  getCodeList("GearType")
+  # table ( eflalo$LE_GEAR %in%m4_ices$Key )   # TRUE records accepted in DATSU, FALSE aren't
+  # 
+  # # Get summary  of   DATSU valid/not valid records
+  # eflalo [ ! eflalo$LE_GEAR %in%m4_ices$Key,]%>%group_by(LE_GEAR)%>%dplyr::select(LE_GEAR)%>%tally()
+  # 
+  # # Correct or dismiss not valid records (if any) and filter only valid ones
+  # 
+  # eflalo      <-  eflalo%>%filter(LE_GEAR %in% m4_ices$Key)
+  # 
+  # 
+  # # Calculate the number of remaining records and the percentage of records removed
+  # num_records <- nrow(eflalo)
+  # percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
+  # 
+  # 
+  # # Add to remrecsEflalo
+  # remrecsEflalo["MetierL4_LE_GEAR",] <- c(nrow(eflalo), nrow(eflalo)/as.numeric(remrecsEflalo["Total","RowsRemaining"])*100)
   
   
   
@@ -422,23 +434,23 @@ for(year in yearsToSubmit){
   
   ### 3.5.5 Check Metier L6 (Fishing Activity) categories are accepted -----------
   
-  m6_ices         <-  getCodeList("Metier6_FishingActivity")
-  
-  table ( eflalo$LE_MET %in%m6_ices$Key )   # TRUE records accepted in DATSU, FALSE aren't
-  
-  # Get summary  of   DATSU valid/not valid records
-  eflalo [ ! eflalo$LE_MET  %in%m6_ices$Key,]%>%group_by(LE_MET)%>%dplyr::select(LE_MET)%>%tally()
-  
-  # Correct them if any not valid and filter only valid ones
-  eflalo      <-  eflalo%>%filter(LE_MET %in% m6_ices$Key)
-  
-  # Calculate the number of remaining records and the percentage of records removed
-  num_records <- nrow(eflalo)
-  percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
-  
-  
-  # Add to remrecsEflalo
-  remrecsEflalo["MetierL6_LE_MET",] <- c(nrow(eflalo), nrow(eflalo)/as.numeric(remrecsEflalo["Total","RowsRemaining"])*100)
+  # m6_ices         <-  getCodeList("Metier6_FishingActivity")
+  # 
+  # table ( eflalo$LE_MET %in%m6_ices$Key )   # TRUE records accepted in DATSU, FALSE aren't
+  # 
+  # # Get summary  of   DATSU valid/not valid records
+  # eflalo [ ! eflalo$LE_MET  %in%m6_ices$Key,]%>%group_by(LE_MET)%>%dplyr::select(LE_MET)%>%tally()
+  # 
+  # # Correct them if any not valid and filter only valid ones
+  # eflalo      <-  eflalo%>%filter(LE_MET %in% m6_ices$Key)
+  # 
+  # # Calculate the number of remaining records and the percentage of records removed
+  # num_records <- nrow(eflalo)
+  # percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
+  # 
+  # 
+  # # Add to remrecsEflalo
+  # remrecsEflalo["MetierL6_LE_MET",] <- c(nrow(eflalo), nrow(eflalo)/as.numeric(remrecsEflalo["Total","RowsRemaining"])*100)
   
   
   

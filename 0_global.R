@@ -10,6 +10,8 @@
 # 0.1 Preparations                                                          ----
 #'------------------------------------------------------------------------------
 
+setwd("C:/Users/MD09/OneDrive - CEFAS/projects/datacalls/ices/2024")
+
 # Clear the workspace
 rm(list=ls())
 
@@ -1079,69 +1081,120 @@ trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
   
   tz <- data.table(tacsatp)[FT_REF  %in% tst[V1>1]$FT_REF]
   suppressWarnings(tz[, (col) := NULL])
+   
+  
+  
   if(trust_logbook){
     
     ## First bind by landing date
+    
     e2 <- e[,.(get(col)[length(unique(get(col))) == 1]), by = .(FT_REF, LE_CDAT)]
     names(e2) <- c("FT_REF", "LE_CDAT", col)
     
     tz <- tz |> 
       left_join(e2, by = c("FT_REF" = "FT_REF", "SI_DATE" = "LE_CDAT"), relationship = "many-to-many")
     
-    tz <- unique(tz)
+    tz <- unique(tz) %>%  as.data.frame()
     
-    #If some are still missing, use haul information to get the closest time
-    if(nrow(tz[is.na(get(col))]) > 0){
-      #set formats right
-      e$FT_DDATIM <- as.POSIXct(paste(e$FT_DDAT, e$FT_DTIME, 
-                                      sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
-      e$FT_LDATIM <- as.POSIXct(paste(e$FT_LDAT, e$FT_LTIME, 
-                                      sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
-      
-      e$LE_SDATTIM <- as.POSIXct(paste(e$LE_SDAT, e$LE_STIME, 
-                                       sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
-      e$LE_EDATTIM <- as.POSIXct(paste(e$LE_EDAT, e$LE_ETIME, 
-                                       sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
-      
-      tx <- tz[is.na(get(col))]
-      tx[, (col) := NULL]
-      
-      mx <- rbind(e[,.(meantime = LE_SDATTIM), by = .(get(col), FT_REF)], e[,.(meantime = LE_EDATTIM), by = .(get(col), FT_REF)])
-      names(mx) <-  c(col, "FT_REF", "meantime")
-      
-      tx[, time := SI_DATIM]
-      
-      setkey(tx, FT_REF, time)
-      setkey(mx, FT_REF, meantime)
-      tx <- mx[tx, roll="nearest"]
-      tx$meantime <- NULL
-      tz <- rbindlist(list(tz[!is.na(get(col))], tx), fill = T)
-      
-    }
-    
-  }else{
-    tz[, (col) := NA]
-  }
+    #If some are still missing, use haul information  ( LE_SDATIM , LE_EDATIM) to get the closest time
+  #   if(nrow(tz[is.na(get(col))]) > 0){ 
+  #    
+  #      if  ("LE_SDATTIM" %in% names(e)) {
+  #     
+  #         str( e)
+  #         
+  #        if ( ! class(e$FT_DDATIM )[1] == "POSIXct" )  { 
+  #         #set formats right
+  #         e$FT_DDATIM <- as.POSIXct(paste(e$FT_DDAT, e$FT_DTIME,
+  #                                         sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
+  #         e$FT_LDATIM <- as.POSIXct(paste(e$FT_LDAT, e$FT_LTIME,
+  #                                         sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
+  #   
+  #         e$LE_SDATTIM <- as.POSIXct(paste(e$LE_SDAT, e$LE_STIME,
+  #                                          sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
+  #         e$LE_EDATTIM <- as.POSIXct(paste(e$LE_EDAT, e$LE_ETIME,
+  #                                          sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
+  #        } 
+  #         
+  #         tx <- tz[is.na(get(col))]
+  #         tx[, (col) := NULL]
+  #         
+  #         
+  #        
+  #          q1 = e[,.(meantime = LE_SDATTIM), by = .(get(col), FT_REF)]
+  #          q2 = e[,.(meantime = LE_EDATTIM), by = .(get(col), FT_REF)]
+  #           mx <- rbind(q1 ,q2 )
+  #           names(mx) <-  c(col, "FT_REF", "meantime")
+  #           setkey(mx, FT_REF, meantime)
+  #           tx <- mx[tx, roll="nearest"]
+  #           tx$meantime <- NULL
+  #           
+  #        
+  #         
+  #           
+  #           tx[, time := SI_DATIM]
+  #           
+  #           setkey(tx, FT_REF, time)
+  #           
+  #          
+  #           tz <- rbindlist(list(tz[!is.na(get(col))], tx), fill = T)
+  #     
+  #      } else {
+  #        print("dataframe EFLALO  has no LE_SDATTIM column")
+  #        
+  #      }
+  #    
+  # }else{
+  #   
+  #   tz[, (col) := NA]
+  # tz_all
+  #   }
   
   # Bind to the category with most value
-  if(nrow(tz[is.na(get(col))]) > 0){
     
-    if(!"LE_KG_TOT" %in% names(e)){
-      idxkgeur <- colnames(e)[grepl("LE_KG_|LE_EURO_", colnames(e))]
+  if(nrow(tz %>%  filter ( is.na ( LE_GEAR))) > 0){
+    
+    ft_ref_isna = tz %>%  filter ( is.na ( LE_GEAR)) %>%  distinct(FT_REF) %>% pull()
+     tz2 = tz %>%  filter ( FT_REF %in% ft_ref_isna ) %>%  as.data.frame()
+     e2 = e %>%  filter ( FT_REF %in% ft_ref_isna )
+    
+    
+    if(!"LE_KG_TOT" %in% names(e2)){
+      idxkgeur <- colnames(e2)[grepl("LE_KG_|LE_EURO_", colnames(e2))]
       # Calculate the total KG and EURO for each row
-      e$LE_KG_TOT <- rowSums(e[,..idxkgeur], na.rm = TRUE)
+      e2$LE_KG_TOT <- rowSums(e2[,..idxkgeur], na.rm = TRUE)
     }
     
-    highvalue <- e[,.(LE_KG_TOT = sum(LE_KG_TOT, na.rm = T)), by = .(FT_REF, get(col))]
+    highvalue <- e2[,.(LE_KG_TOT = sum(LE_KG_TOT, na.rm = T)), by = .(FT_REF, get(col))]
     highvalue <- highvalue[,.(get[which.max(LE_KG_TOT)]), by = .(FT_REF)]
     names(highvalue) <-  c("FT_REF", col)
     
-    tx <- tz[is.na(get(col))]
-    tx[, (col) := NULL]
-    tz <- merge(tx, highvalue)
+    tx2 <- tz2 
+    tx2 = tx2 %>%  select ( - any_of( col )  )
+    tz2 <- tx2 %>%  inner_join ( highvalue, by =  "FT_REF")
+    
   }
-  return(tz)
+   
+    
+   tz =   tz %>%  filter(  !is.na ( LE_GEAR))   
+   tz_all =  rbind (tz , tz2 )  
+    
+  return(tz_all)
+    
+  }
+  
+  
 }
+
+
+
+
+
+
+
+
+
+
 
 predict_gear_width_mod <- function(model, coefficient, data) {
   coeffs <- unique(coefficient)

@@ -40,6 +40,7 @@ for(year in yearsToSubmit){
   
   # Save not merged tacsat data
   # Subset 'tacsatp' where 'FT_REF' equals 0 (not merged)
+  tacsatp$FT_REF <- tacsatp$SI_FT
   tacsatpmin <- subset(tacsatp, FT_REF == 0)
   
   # Feedback on tacsatpmin
@@ -57,9 +58,15 @@ for(year in yearsToSubmit){
   #'----------------------------------------------------------------------------
   # 2.1.3 For multi gear/metier etc trips, divide the pings to the right gear/metier etc. ----
   #'----------------------------------------------------------------------------
-
-  tacsatpa_LE_GEAR <- trip_assign(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T)
-  tacsatp <- rbindlist(list(tacsatp[tacsatp$FT_REF %!in% tacsatpa_LE_GEAR$FT_REF,], tacsatpa_LE_GEAR), fill = T)
+  tacsatp_bk <- tacsatp
+  tacsatp <- tacsatp_bk
+  
+  
+  tacsatpa_LE_GEAR <- trip_assign(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T) 
+  tacsatp <- rbindlist(  list(  tacsatp[tacsatp$FT_REF %!in% tacsatpa_LE_GEAR$FT_REF,], tacsatpa_LE_GEAR   )    , fill = T)
+  
+  tacsatp %>% filter(!is.na(LE_GEAR)) %>% tally()
+  
   
   tacsatpa_LE_MSZ <- trip_assign(tacsatp, eflalo, col = "LE_MSZ", trust_logbook = T)
   tacsatp <- rbindlist(list(tacsatp[tacsatp$FT_REF %!in% tacsatpa_LE_MSZ$FT_REF,], tacsatpa_LE_MSZ), fill = T)
@@ -69,6 +76,19 @@ for(year in yearsToSubmit){
   
   tacsatpa_LE_MET <- trip_assign(tacsatp, eflalo, col = "LE_MET", trust_logbook = T)
   tacsatp <- rbindlist(list(tacsatp[tacsatp$FT_REF %!in% tacsatpa_LE_MET$FT_REF,], tacsatpa_LE_MET), fill = T)
+  
+  
+  tacsatp %>% filter (is.na( LE_GEAR ) )   %>% left_join(eflalo %>% rename(eLE_GEAR = LE_GEAR), by = "FT_REF" ) %>% 
+    mutate (   LE_GEAR  = eLE_GEAR )     
+  
+  
+  [tacsatp$FT_REF %!in% tacsatpa_LE_GEAR$FT_REF, LE_GEAR := ]
+   
+  
+  tacsatp$LE_GEAR     = eflalo$LE_GEAR    [ match(tacsatp$FT_REF, eflalo$FT_REF)]
+  tacsatp$LE_MSZ      = eflalo$LE_MSZ     [ match(tacsatp$FT_REF, eflalo$FT_REF)]
+  tacsatp$LE_RECT     = eflalo$LE_RECT    [ match(tacsatp$FT_REF, eflalo$FT_REF)]
+  tacsatp$LE_MET      = eflalo$LE_MET     [ match(tacsatp$FT_REF, eflalo$FT_REF)]
   
   if("LE_WIDTH" %in% names(eflalo)){
     tacsatpa_LE_WIDTH <- trip_assign(tacsatp, eflalo, col = "LE_WIDTH", trust_logbook = T)
