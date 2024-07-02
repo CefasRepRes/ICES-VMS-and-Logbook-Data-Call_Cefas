@@ -5,6 +5,7 @@ library(data.table)
 library(icesVocab)
 
 # source("C:\\Users\\MD09\\Documents\\git\\ICES-VMS-and-Logbook-Data-Call_Cefas\\0_global.R")
+source("C:\\Users\\MD09\\OneDrive - CEFAS\\projects\\datacalls\\ices\\2024\\global-subset.R")
 
 #'------------------------------------------------------------------------------
 #
@@ -225,6 +226,8 @@ for(year in yearsToSubmit){
   message("Cleaning tacsat completed for year ", year)
   print(remrecsTacsat)
   
+  eflalo %>% filter(FT_REF == 610917780)
+  tacsat %>% filter(FT_REF == 610917780)
   
   #'----------------------------------------------------------------------------
   # 1.3 Clean the EFLALO data --------------------------------------------------
@@ -308,6 +311,7 @@ for(year in yearsToSubmit){
   
   # 1.3.5 Remove trip starting before 1st Jan ----------------------------------
   eflalo_bk <- eflalo
+  eflalo <- eflalo_bk
   # Call the remove before january function with the appropriate arguments
   eflalo <- remove_before_jan(eflalo, year)
   
@@ -340,61 +344,92 @@ for(year in yearsToSubmit){
   # 1.3.7 Remove trip with overlap with another trip ---------------------------
   
   # Order 'eflalo' by 'VE_COU', 'VE_REF', 'FT_DDATIM', and 'FT_LDATIM'
-  eflalo <- orderBy(~ VE_COU + VE_REF + FT_DDATIM + FT_LDATIM, data = eflalo)
-  
-  # If a trip (same depart and return times) has more than one FT_REF, make them all into the same (first) FT_REF. 
-  dt1 <- data.table(eflalo)[,.(VE_REF, FT_REF, FT_DDATIM, FT_LDATIM)]
-  
-  dt1 <- unique(dt1, by = c("VE_REF", "FT_REF"))
-  
-  setkey(dt1, VE_REF, FT_DDATIM, FT_LDATIM)
-  dt2 <- dt1[, ref := .N > 1, by = key(dt1)][ref == T]
-  
-  dt3 <- dt2[,.(FT_REF_NEW = FT_REF[1]), by = .(VE_REF, FT_DDATIM, FT_LDATIM)]
-  
-  dt4 <- merge(dt2, dt3)
-  
-  eflalo2 <- merge(data.table(eflalo), dt4, all.x = T)
-  eflalo2[!is.na(FT_REF_NEW), FT_REF := FT_REF_NEW]
-  eflalo2[, FT_REF_NEW := NULL]
-  
-  eflalo <- data.frame(eflalo2)
-  
-  eflalo <- eflalo %>% dplyr::select(-ref)
-  
-  # Create a data table 'dt1' with the necessary columns from 'eflalo'
-  dt1 <- data.table(ID = eflalo$VE_REF, FT = eflalo$FT_REF,
-                    startdate = eflalo$FT_DDATIM,
-                    enddate = eflalo$FT_LDATIM)
-  
-  # Remove duplicate rows from 'dt1'
-  dt1 <- dt1[!duplicated(paste(dt1$ID, dt1$FT)), ]
-  
-  # Set keys for 'dt1' for efficient joining and overlapping
-  setkey(dt1, ID, startdate, enddate)
-  
-  # Find overlapping trips in 'dt1'
-  result <- foverlaps(dt1, dt1, by.x = c("ID", "startdate", "enddate"),
-                      by.y = c("ID", "startdate", "enddate"))
-  
-  # Filter 'result' to get only the rows where trips overlap
-  overlapping.trips <- subset(result, startdate < i.enddate & enddate > i.startdate & FT != i.FT)
-  
-  # If there are overlapping trips, remove them from 'eflalo' and save them to a file
-  if (nrow(overlapping.trips) > 0) {
-    eflalo <- eflalo[!eflalo$FT_REF %in% overlapping.trips$FT, ]
-    
-    print("THERE ARE OVERLAPPING TRIPS IN THE DATASET -> SEE THE FILE overlappingTrips SAVED IN THE RESULTS FOLDER")
-    
-    save(overlapping.trips, file = file.path(outPath, paste0("overlappingTrips", year, ".RData")))
-  } 
-  
-  # Calculate the number of remaining records and the percentage of records removed
-  num_records <- nrow(eflalo)
-  percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
-  
-  # Update the remrecsEflalo data frame with these values
-  remrecsEflalo["overlappingTrips",] <- c(num_records, (100 + percent_removed))
+  # eflalo <- orderBy(~ VE_COU + VE_REF + FT_DDATIM + FT_LDATIM, data = eflalo)
+  # 
+  # # If a trip (same depart and return times) has more than one FT_REF, make them all into the same (first) FT_REF. 
+  # dt1 <- data.table(eflalo)[,.(VE_REF, FT_REF, FT_DDATIM, FT_LDATIM)]
+  # 
+  # dt1 <- unique(dt1, by = c("VE_REF", "FT_REF"))
+  # 
+  # setkey(dt1, VE_REF, FT_DDATIM, FT_LDATIM)
+  # dt2 <- dt1[, ref := .N > 1, by = key(dt1)][ref == T]
+  # 
+  # dt3 <- dt2[,.(FT_REF_NEW = FT_REF[1]), by = .(VE_REF, FT_DDATIM, FT_LDATIM)]
+  # 
+  # dt4 <- merge(dt2, dt3)
+  # 
+  # eflalo2 <- merge(data.table(eflalo), dt4, all.x = T)
+  # eflalo2[!is.na(FT_REF_NEW), FT_REF := FT_REF_NEW]
+  # eflalo2[, FT_REF_NEW := NULL]
+  # 
+  # eflalo <- data.frame(eflalo2)
+  # 
+  # eflalo <- eflalo %>% dplyr::select(-ref)
+  # 
+  # eflalo_bk  -> eflalo
+  # eflalo = eflalo_over
+  # 
+  # # Create a data table 'dt1' with the necessary columns from 'eflalo'
+  # dt1 <- data.table(ID = eflalo$VE_REF, FT = eflalo$FT_REF,
+  #                   startdate = eflalo$FT_DDATIM,
+  #                   enddate = eflalo$FT_LDATIM)
+  # 
+  # # Remove duplicate rows from 'dt1'
+  # dt1 <- dt1[!duplicated(paste(dt1$ID, dt1$FT)), ]
+  # 
+  # # Set keys for 'dt1' for efficient joining and overlapping
+  # setkey(dt1, ID, startdate, enddate)
+  # 
+  # # Find overlapping trips in 'dt1'
+  # result <- foverlaps(dt1, dt1, by.x = c("ID", "startdate", "enddate"),
+  #                     by.y = c("ID", "startdate", "enddate"))
+  # 
+  # 
+  # 
+  # # Filter 'result' to get only the rows where trips overlap
+  # overlapping.trips <- subset(result, startdate < i.enddate & enddate > i.startdate & FT != i.FT)
+  # 
+  # tt = overlapping.trips %>%  as.data.frame()
+  # 
+  # ft_tt = distinct ( tt, FT) %>%  pull() 
+  # 
+  # eflalo$LE_CDATIM = ymd_hms(  paste0  ( eflalo$LE_CDAT, '12:00:00' ) , tz = 'GMT' ) 
+  # eflalo$FT_LDATIM
+  # str( eflalo)
+  # 
+  # eflalo_over = eflalo %>%  select (   VE_REF, FT_REF , FT_DDATIM, FT_LDATIM , LE_CDATIM) %>% filter ( FT_REF %in% ft_tt  ) %>%  
+  #   group_by(VE_REF , FT_REF) %>% 
+  #   arrange(VE_REF, FT_REF , FT_DDATIM, LE_CDATIM ) %>% 
+  #   mutate(rn = row_number()) %>%  mutate(max_rn = max ( rn)) %>% 
+  #   filter ( rn == max_rn) %>% 
+  #   mutate ( diff_cdat_end =  difftime ( FT_LDATIM ,  LE_CDATIM , units = "days") %>%  as.numeric() ) %>% 
+  #   arrange(desc(diff_cdat_end)) %>%  #ungroup() %>% 
+  #   mutate( FT_LDATIM =  ifelse ( diff_cdat_end > 3 , ymd_hms( LE_CDATIM), ymd_hms(FT_LDATIM)) )
+  # 
+  # 
+  # eflalo %>% filter ( FT_REF %in% c( '610837089', '610819824') )
+  # options  ( tibble.width = 100 )
+  # 
+  # # If there are overlapping trips, remove them from 'eflalo' and save them to a file
+  # if (nrow(overlapping.trips) > 0) {
+  #   eflalo <- eflalo[!eflalo$FT_REF %in% overlapping.trips$FT, ]
+  #   
+  #   print("THERE ARE OVERLAPPING TRIPS IN THE DATASET -> SEE THE FILE overlappingTrips SAVED IN THE RESULTS FOLDER")
+  #   
+  #   save(overlapping.trips, file = file.path(outPath, paste0("overlappingTrips", year, ".RData")))
+  # } 
+  # 
+  # eflalo %>% filter(FT_REF == 610917780)
+  # tacsat %>% filter(FT_REF == 610917780)
+  # 
+  # focus_trip <- overlapping.trips %>% filter(FT == 610917780)
+  # 
+  # # Calculate the number of remaining records and the percentage of records removed
+  # num_records <- nrow(eflalo)
+  # percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
+  # 
+  # # Update the remrecsEflalo data frame with these values
+  # remrecsEflalo["overlappingTrips",] <- c(num_records, (100 + percent_removed))
   
   
   
@@ -481,7 +516,6 @@ rm(harbours, harbours_alt, ICESareas, tacsat_name, eflalo_name, tacsat, eflalo, 
    ia, overs, tacsatx, coords, invalid_positions, 
    trip_id, percent_removed, num_records, idx, dt1, result, overlapping.trips)
 rm(list = ls(pattern = "_20"))
-
 
 
 #'------------------------------------------------------------------------------

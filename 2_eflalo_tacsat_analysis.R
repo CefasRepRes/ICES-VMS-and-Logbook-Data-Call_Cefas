@@ -5,15 +5,28 @@
 #
 #'------------------------------------------------------------------------------
 
+setwd("C:/Users/MD09/OneDrive - CEFAS/projects/datacalls/ices/2024")
+
+source("C:\\Users\\MD09\\OneDrive - CEFAS\\projects\\datacalls\\ices\\2024\\global-subset.R")
+
+
+
+year = 2023
+
 # Looping through the years to submit
 for(year in yearsToSubmit){
-  print(paste0("Start loop for year ",year))
+  print(paste0("Start loop for year ", year))
   
   #'----------------------------------------------------------------------------
   # 2.1.0 load TACSAT and EFLALO data from file                             ----
   #'----------------------------------------------------------------------------
-  load(file = paste0(outPath,paste0("/cleanEflalo",year,".RData")) )
+  load(file = paste0(outPath, paste0("/cleanEflalo",year,".RData")) )
   load(file = paste0(outPath, paste0("/cleanTacsat", year,".RData")) )
+  
+  tacsat %>% distinct(FT_REF) %>% tally()
+  eflalo %>% distinct(FT_REF) %>% tally()
+  
+  eflalo %>% filter(FT_REF == 610917780)
   
   # Assign geometry column to tacsat for later operations
   tacsat$geometry <- NULL
@@ -21,8 +34,17 @@ for(year in yearsToSubmit){
   #'----------------------------------------------------------------------------
   # 2.1.1 Merge TACSAT and EFLALO                                             ----
   #'----------------------------------------------------------------------------
-  tacsatp <- mergeEflalo2Tacsat(eflalo,tacsat)
+ 
+         #  tacsatp <- mergeEflalo2Tacsat(eflalo,tacsat)
+        
   
+  ## CEFAS version update
+  ## TACSAT data formated previously by CEfas script version provide the information given by the resutl fo function above 
+  ## The result of funciton above is TACSAT data with the link to FT_REF in eflalo records. 
+  
+        tacsatp = tacsat
+  
+  ## END of CEFAS UPDATE 
   
   #'----------------------------------------------------------------------------
   # 2.1.2 Assign gear and length                                              ----
@@ -30,11 +52,18 @@ for(year in yearsToSubmit){
   # Define the columns to be added
   cols <- c("LE_GEAR", "LE_MSZ", "VE_LEN", "VE_KW", "LE_RECT", "LE_MET", "LE_WIDTH", "VE_FLT", "VE_COU")
   
+   
+  
   # Use a loop to add each column
   for (col in cols) {
     # Match 'FT_REF' values in 'tacsatp' and 'eflalo' and use these to add the column from 'eflalo' to 'tacsatp'
-    tacsatp[[col]] <- eflalo[[col]][match(tacsatp$FT_REF, eflalo$FT_REF)]
+    tacsatp[[col]] <- eflalo[[col]][match(as.numeric(tacsatp$FT_REF), as.numeric(eflalo$FT_REF))]
   }
+  
+  tacsatp %>%  filter(  LE_GEAR %>%  is.na())  %>% distinct (FT_REF)
+  
+  eflalo %>% filter( FT_REF == '610838243')
+  tacsatp %>%  filter( SI_FT == '610838243')
 
   tacsatp <- data.frame(tacsatp)
   
@@ -59,13 +88,24 @@ for(year in yearsToSubmit){
   # 2.1.3 For multi gear/metier etc trips, divide the pings to the right gear/metier etc. ----
   #'----------------------------------------------------------------------------
   tacsatp_bk <- tacsatp
-  tacsatp <- tacsatp_bk
+  # tacsatp <- tacsatp_bk
   
   
   tacsatpa_LE_GEAR <- trip_assign(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T) 
-  tacsatp <- rbindlist(  list(  tacsatp[tacsatp$FT_REF %!in% tacsatpa_LE_GEAR$FT_REF,], tacsatpa_LE_GEAR   )    , fill = T)
+  tacsatp <- rbindlist(list(tacsatp[tacsatp$FT_REF %!in% tacsatpa_LE_GEAR$FT_REF,], tacsatpa_LE_GEAR), fill = T)
   
-  tacsatp %>% filter(!is.na(LE_GEAR)) %>% tally()
+  dim(tacsatpa_LE_GEAR)
+  dim(tacsatp)
+  
+  
+  tacsatp %>% filter(is.na(LE_GEAR)) %>% tally()
+  
+  tacsatp %>%  filter( FT_REF == '610917780')
+  
+  eflalo %>% filter ( FT_REF == 'c')
+  
+  tacsatp$FT_REF <- as.numeric(tacsatp$FT_REF)
+  eflalo$FT_REF <- as.numeric(eflalo$FT_REF)
   
   
   tacsatpa_LE_MSZ <- trip_assign(tacsatp, eflalo, col = "LE_MSZ", trust_logbook = T)

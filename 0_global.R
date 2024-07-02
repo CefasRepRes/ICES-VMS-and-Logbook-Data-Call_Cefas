@@ -1067,11 +1067,15 @@ act.tac <- function (tacsat, units = "year", analyse.by = "LE_L5MET", storeSchem
 # Define a function to assign tripnumber to Tacsat data
 trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
   
+  
+  
   if(col == "LE_MET"){
     tst <- data.table(eflalo)[get(col) %in% valid_metiers & !is.na(get(col)) ,.(uniqueN(get(col))), by=.(FT_REF)]
   }else{
     tst <- data.table(eflalo)[!is.na(get(col)),.(uniqueN(get(col))), by=.(FT_REF)]
   }
+  
+  
   if(nrow(tst[V1>1])==0){
     warning(paste("No duplicate", col, "in tacsatp"))
     return(data.frame())
@@ -1082,7 +1086,6 @@ trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
   tz <- data.table(tacsatp)[FT_REF  %in% tst[V1>1]$FT_REF]
   suppressWarnings(tz[, (col) := NULL])
    
-  
   
   if(trust_logbook){
     
@@ -1178,6 +1181,10 @@ trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
     
    tz =   tz %>%  filter(  !is.na ( LE_GEAR))   
    tz_all =  rbind (tz , tz2 )  
+   
+   
+   
+   
     
   return(tz_all)
     
