@@ -5,7 +5,7 @@ library(data.table)
 library(icesVocab)
 
 # source("C:\\Users\\MD09\\Documents\\git\\ICES-VMS-and-Logbook-Data-Call_Cefas\\0_global.R")
-source("C:\\Users\\MD09\\OneDrive - CEFAS\\projects\\datacalls\\ices\\2024\\global-subset.R")
+source("C:\\Users\\MD09\\Documents\\git\\ICES-VMS-and-Logbook-Data-Call_Cefas\\global-subset.R")
 
 #'------------------------------------------------------------------------------
 #
@@ -68,8 +68,8 @@ for(year in yearsToSubmit){
   # eflalo <- data.frame(get(eflalo_name)) # rename to eflalo
   
   #- Make sure data is in right format
-  tacsat <- formatTacsat(tacsat)
-  eflalo <- formatEflalo(eflalo)
+  # tacsat <- formatTacsat(tacsat)
+  # eflalo <- formatEflalo(eflalo)
   
   ### IF TOO MUCH ISSUES , MOVE ON.
   
@@ -226,8 +226,6 @@ for(year in yearsToSubmit){
   message("Cleaning tacsat completed for year ", year)
   print(remrecsTacsat)
   
-  eflalo %>% filter(FT_REF == 610917780)
-  tacsat %>% filter(FT_REF == 610917780)
   
   #'----------------------------------------------------------------------------
   # 1.3 Clean the EFLALO data --------------------------------------------------
@@ -311,7 +309,7 @@ for(year in yearsToSubmit){
   
   # 1.3.5 Remove trip starting before 1st Jan ----------------------------------
   eflalo_bk <- eflalo
-  eflalo <- eflalo_bk
+  # eflalo <- eflalo_bk
   # Call the remove before january function with the appropriate arguments
   eflalo <- remove_before_jan(eflalo, year)
   
