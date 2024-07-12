@@ -5,6 +5,12 @@
 #
 #'------------------------------------------------------------------------------
 
+setwd("C:/Users/MD09/OneDrive - CEFAS/projects/datacalls/ices/2024")
+
+source("C:\\Users\\MD09\\Documents\\git\\ICES-VMS-and-Logbook-Data-Call_Cefas\\global-subset.R")
+
+year = 2023
+
 # Loop through years to submit
 for(year in yearsToSubmit){
   
@@ -15,8 +21,9 @@ for(year in yearsToSubmit){
   # 3.1 Create table 2                                                    ----
   #'----------------------------------------------------------------------------
   # Extract the year and month from the date-time column
-  eflalo$Year <- year(eflalo$FT_LDATIM)
-  eflalo$Month <- month(eflalo$FT_LDATIM)
+  colnames(eflalo)
+  # eflalo$Year <- year(eflalo$FT_LDATIM)
+  # eflalo$Month <- month(eflalo$FT_LDATIM)
   
   # Set interval to 1 day for later caculation of kwDays
   eflalo$INTV <- 1
@@ -85,6 +92,11 @@ for(year in yearsToSubmit){
     "LE_MET", "SI_SP", "INTV", "VE_LEN", "kwHour", "VE_KW", "LE_KG_TOT", "LE_EURO_TOT",
     "GEARWIDTH", "SA_M2")
   
+  cols <- c(
+    "VE_REF", "VE_COU", "YEAR", "MONTH", "Csquare", "MSFD_BBHT", "depth", "LE_GEAR",
+    "LE_MET", "SI_SP", "INTV", "VE_LEN", "kwHour", "VE_KW", "LE_KG_TOT", "LE_EURO_TOT")
+  
+  cols %in% colnames(eflalo)
   
   # Create or append to table1 based on the year
   if (year == yearsToSubmit[1]) {
