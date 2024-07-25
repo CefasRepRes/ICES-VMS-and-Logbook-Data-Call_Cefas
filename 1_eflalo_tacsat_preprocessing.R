@@ -1,3 +1,12 @@
+library(vmstools)
+library(lubridate)
+library(doBy)
+library(data.table)
+library(icesVocab)
+
+# source("C:\\Users\\MD09\\Documents\\git\\ICES-VMS-and-Logbook-Data-Call_Cefas\\0_global.R")
+source("C:\\Users\\MD09\\Documents\\git\\ICES-VMS-and-Logbook-Data-Call_Cefas\\global-subset.R")
+
 #'------------------------------------------------------------------------------
 #
 # Script to extract and process VMS and logbook data for ICES VMS data call
@@ -10,21 +19,21 @@
 #'------------------------------------------------------------------------------
 # Load the data underlying VMStools    
 # data(euharbours); if(substr(R.Version()$os,1,3)== "lin")
-data(harbours)
-data(ICESareas)
-
-harbours_alt <- 
-  harbours |> 
-  # Convert spelling to ISO
-  dplyr::mutate(harbour = iconv(harbour, from = "latin1", to = "UTF-8")) |> 
-  as_tibble() |> 
-  sf::st_as_sf(coords = c("lon", "lat"),
-               crs = 4326) |> 
-  sf::st_transform(crs = 3857) |> 
-  # the range in harbour is always 3 km
-  sf::st_buffer(dist = 3000) |> 
-  sf::st_transform(crs = 4326) |> 
-  dplyr::select(harbour)
+# data(harbours)
+# data(ICESareas)
+# 
+# harbours_alt <- 
+#   harbours |> 
+#   # Convert spelling to ISO
+#   dplyr::mutate(harbour = iconv(harbour, from = "latin1", to = "UTF-8")) |> 
+#   as_tibble() |> 
+#   sf::st_as_sf(coords = c("lon", "lat"),
+#                crs = 4326) |> 
+#   sf::st_transform(crs = 3857) |> 
+#   # the range in harbour is always 3 km
+#   sf::st_buffer(dist = 3000) |> 
+#   sf::st_transform(crs = 4326) |> 
+#   dplyr::select(harbour)
 
 
 
@@ -51,18 +60,23 @@ for(year in yearsToSubmit){
   #       dataPath,
   #       paste0("eflalo_", year, ".RData")
   #     )); #- data is saved as eflalo_2009, eflalo_2010 etc
-  
+ 
   
   ## MIKE: Load the data form GeoFISH source. Do not LOAD as SF , only as plain text 
   ## ONLY VESSELS >= 12 meters
   
+ 
   
-  tacsat <- data.frame(get(tacsat_name)) # rename to tacsat
-  eflalo <- data.frame(get(eflalo_name)) # rename to eflalo
+  ## MIKE: Load the data form GeoFISH source. Do not LOAD as SF, only as plain text 
+  ## ONLY VESSELS >= 12 meters
+  # tacsat <- data.frame(get(tacsat_name)) # rename to tacsat
+  # eflalo <- data.frame(get(eflalo_name)) # rename to eflalo
   
   #- Make sure data is in right format
-  tacsat <- formatTacsat(tacsat)
-  eflalo <- formatEflalo(eflalo)
+  # tacsat <- formatTacsat(tacsat)
+  # eflalo <- formatEflalo(eflalo)
+  
+  ### IF TOO MUCH ISSUES , MOVE ON.
   
   ### IF TOO MUCH ISSUES , MOVE ON.
   
@@ -112,8 +126,11 @@ for(year in yearsToSubmit){
   
   # 1.2.2 Remove duplicate records ---------------------------------------------
   
+  tacsat_bk <- tacsat
+  
   # Convert SI_DATE and SI_TIME to POSIXct
-  tacsat$SI_DATIM <- as.POSIXct(paste(tacsat$SI_DATE, tacsat$SI_TIME), tz = "GMT", format = "%d/%m/%Y  %H:%M")
+  # tacsat$SI_DATIM <- as.POSIXct(paste(tacsat$SI_DATE, tacsat$SI_TIME), tz = "GMT", format = "%d/%m/%Y  %H:%M")
+  # tacsat$SI_DATIM = ymd_hms(paste(tacsat$SI_DATE ,tacsat$SI_TIME), tz = "GMT")
   
   # Create a unique identifier for each row
   tacsat$unique_id <- paste(tacsat$VE_REF, tacsat$SI_LATI, tacsat$SI_LONG, tacsat$SI_DATIM)
@@ -131,7 +148,11 @@ for(year in yearsToSubmit){
   # 1.2.3 Remove points that have impossible coordinates -----------------------
   
   # Extract coordinates from tacsat
+<<<<<<< HEAD
   coords <- tacsat |>  select ( SI_LONG, SI_LATI )
+=======
+  coords <- tacsat |> dplyr::select ( SI_LONG, SI_LATI )
+>>>>>>> 48c54449d14930ce1275ed53b83c8102d0c49585
   
   # Check for impossible positions
   invalid_positions <- which(coords[,2] > 90 | coords[,2] < -90 | coords[,1] > 180 | coords[,1] < -180)
@@ -204,7 +225,7 @@ for(year in yearsToSubmit){
     file = file.path(outPath, paste0("remrecsTacsat", year, ".RData"))
   )
   tacsat <- as.data.frame(tacsat)
-  tacsat <- tacsat %>% dplyr::select(-geometry)
+  # tacsat <- tacsat %>% dplyr::select(-geometry)
   tacsat <- tacsat %>% dplyr::select(-unique_id)
   #  Save the cleaned tacsat file
   
@@ -263,7 +284,7 @@ for(year in yearsToSubmit){
   # 
   # 
   # 1.3.3 Remove non-unique trip numbers --------------------------------------
-  
+  eflalo_bk <- eflalo
   # Apply the trip ID function to the eflalo data frame
   trip_id <- create_trip_id(eflalo)
   
@@ -280,12 +301,15 @@ for(year in yearsToSubmit){
   # 1.3.4 Remove impossible time stamp records ---------------------------------
   
   # Apply the convert to date-time function to the FT_DDAT and FT_DTIME columns
-  eflalo$FT_DDATIM <- convert_to_datetime(eflalo$FT_DDAT, eflalo$FT_DTIME)
+  # eflalo$FT_DDATIM <- convert_to_datetime(eflalo$FT_DDAT, eflalo$FT_DTIME)
+  # eflalo$FT_DDATIM = ymd_hms(paste(eflalo$FT_DDAT, eflalo$FT_DTIME), tz = "GMT")
   # Apply the function to the FT_LDAT and FT_LTIME columns
-  eflalo$FT_LDATIM <- convert_to_datetime(eflalo$FT_LDAT, eflalo$FT_LTIME)
+  # eflalo$FT_LDATIM <- convert_to_datetime(eflalo$FT_LDAT, eflalo$FT_LTIME)
+  # eflalo$FT_LDATIM = ymd_hms(paste(eflalo$FT_LDAT, eflalo$FT_LTIME), tz = "GMT") 
   
   # Remove records with NA in either FT_DDATIM or FT_LDATIM
   eflalo <- eflalo[!is.na(eflalo$FT_DDATIM) & !is.na(eflalo$FT_LDATIM), ]
+  
   
   # Calculate the number of remaining records and the percentage of records removed
   num_records <- nrow(eflalo)
@@ -295,7 +319,8 @@ for(year in yearsToSubmit){
   remrecsEflalo["impossible time", ] <- c(num_records, 100 + percent_removed)
   
   # 1.3.5 Remove trip starting before 1st Jan ----------------------------------
-  
+  eflalo_bk <- eflalo
+  # eflalo <- eflalo_bk
   # Call the remove before january function with the appropriate arguments
   eflalo <- remove_before_jan(eflalo, year)
   
@@ -328,61 +353,92 @@ for(year in yearsToSubmit){
   # 1.3.7 Remove trip with overlap with another trip ---------------------------
   
   # Order 'eflalo' by 'VE_COU', 'VE_REF', 'FT_DDATIM', and 'FT_LDATIM'
-  eflalo <- orderBy(~ VE_COU + VE_REF + FT_DDATIM + FT_LDATIM, data = eflalo)
-  
-  # If a trip (same depart and return times) has more than one FT_REF, make them all into the same (first) FT_REF. 
-  dt1 <- data.table(eflalo)[,.(VE_REF, FT_REF, FT_DDATIM, FT_LDATIM)]
-  
-  dt1 <- unique(dt1, by = c("VE_REF", "FT_REF"))
-  
-  setkey(dt1, VE_REF, FT_DDATIM, FT_LDATIM)
-  dt2 <- dt1[, ref := .N > 1, by = key(dt1)][ref == T]
-  
-  dt3 <- dt2[,.(FT_REF_NEW = FT_REF[1]), by = .(VE_REF, FT_DDATIM, FT_LDATIM)]
-  
-  dt4 <- merge(dt2, dt3)
-  
-  eflalo2 <- merge(data.table(eflalo), dt4, all.x = T)
-  eflalo2[!is.na(FT_REF_NEW), FT_REF := FT_REF_NEW]
-  eflalo2[, FT_REF_NEW := NULL]
-  
-  eflalo <- data.frame(eflalo2)
-  
-  eflalo <- eflalo %>% select(-ref)
-  
-  # Create a data table 'dt1' with the necessary columns from 'eflalo'
-  dt1 <- data.table(ID = eflalo$VE_REF, FT = eflalo$FT_REF,
-                    startdate = eflalo$FT_DDATIM,
-                    enddate = eflalo$FT_LDATIM)
-  
-  # Remove duplicate rows from 'dt1'
-  dt1 <- dt1[!duplicated(paste(dt1$ID, dt1$FT)), ]
-  
-  # Set keys for 'dt1' for efficient joining and overlapping
-  setkey(dt1, ID, startdate, enddate)
-  
-  # Find overlapping trips in 'dt1'
-  result <- foverlaps(dt1, dt1, by.x = c("ID", "startdate", "enddate"),
-                      by.y = c("ID", "startdate", "enddate"))
-  
-  # Filter 'result' to get only the rows where trips overlap
-  overlapping.trips <- subset(result, startdate < i.enddate & enddate > i.startdate & FT != i.FT)
-  
-  # If there are overlapping trips, remove them from 'eflalo' and save them to a file
-  if (nrow(overlapping.trips) > 0) {
-    eflalo <- eflalo[!eflalo$FT_REF %in% overlapping.trips$FT, ]
-    
-    print("THERE ARE OVERLAPPING TRIPS IN THE DATASET -> SEE THE FILE overlappingTrips SAVED IN THE RESULTS FOLDER")
-    
-    save(overlapping.trips, file = file.path(outPath, paste0("overlappingTrips", year, ".RData")))
-  } 
-  
-  # Calculate the number of remaining records and the percentage of records removed
-  num_records <- nrow(eflalo)
-  percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
-  
-  # Update the remrecsEflalo data frame with these values
-  remrecsEflalo["overlappingTrips",] <- c(num_records, (100 + percent_removed))
+  # eflalo <- orderBy(~ VE_COU + VE_REF + FT_DDATIM + FT_LDATIM, data = eflalo)
+  # 
+  # # If a trip (same depart and return times) has more than one FT_REF, make them all into the same (first) FT_REF. 
+  # dt1 <- data.table(eflalo)[,.(VE_REF, FT_REF, FT_DDATIM, FT_LDATIM)]
+  # 
+  # dt1 <- unique(dt1, by = c("VE_REF", "FT_REF"))
+  # 
+  # setkey(dt1, VE_REF, FT_DDATIM, FT_LDATIM)
+  # dt2 <- dt1[, ref := .N > 1, by = key(dt1)][ref == T]
+  # 
+  # dt3 <- dt2[,.(FT_REF_NEW = FT_REF[1]), by = .(VE_REF, FT_DDATIM, FT_LDATIM)]
+  # 
+  # dt4 <- merge(dt2, dt3)
+  # 
+  # eflalo2 <- merge(data.table(eflalo), dt4, all.x = T)
+  # eflalo2[!is.na(FT_REF_NEW), FT_REF := FT_REF_NEW]
+  # eflalo2[, FT_REF_NEW := NULL]
+  # 
+  # eflalo <- data.frame(eflalo2)
+  # 
+  # eflalo <- eflalo %>% dplyr::select(-ref)
+  # 
+  # eflalo_bk  -> eflalo
+  # eflalo = eflalo_over
+  # 
+  # # Create a data table 'dt1' with the necessary columns from 'eflalo'
+  # dt1 <- data.table(ID = eflalo$VE_REF, FT = eflalo$FT_REF,
+  #                   startdate = eflalo$FT_DDATIM,
+  #                   enddate = eflalo$FT_LDATIM)
+  # 
+  # # Remove duplicate rows from 'dt1'
+  # dt1 <- dt1[!duplicated(paste(dt1$ID, dt1$FT)), ]
+  # 
+  # # Set keys for 'dt1' for efficient joining and overlapping
+  # setkey(dt1, ID, startdate, enddate)
+  # 
+  # # Find overlapping trips in 'dt1'
+  # result <- foverlaps(dt1, dt1, by.x = c("ID", "startdate", "enddate"),
+  #                     by.y = c("ID", "startdate", "enddate"))
+  # 
+  # 
+  # 
+  # # Filter 'result' to get only the rows where trips overlap
+  # overlapping.trips <- subset(result, startdate < i.enddate & enddate > i.startdate & FT != i.FT)
+  # 
+  # tt = overlapping.trips %>%  as.data.frame()
+  # 
+  # ft_tt = distinct ( tt, FT) %>%  pull() 
+  # 
+  # eflalo$LE_CDATIM = ymd_hms(  paste0  ( eflalo$LE_CDAT, '12:00:00' ) , tz = 'GMT' ) 
+  # eflalo$FT_LDATIM
+  # str( eflalo)
+  # 
+  # eflalo_over = eflalo %>%  select (   VE_REF, FT_REF , FT_DDATIM, FT_LDATIM , LE_CDATIM) %>% filter ( FT_REF %in% ft_tt  ) %>%  
+  #   group_by(VE_REF , FT_REF) %>% 
+  #   arrange(VE_REF, FT_REF , FT_DDATIM, LE_CDATIM ) %>% 
+  #   mutate(rn = row_number()) %>%  mutate(max_rn = max ( rn)) %>% 
+  #   filter ( rn == max_rn) %>% 
+  #   mutate ( diff_cdat_end =  difftime ( FT_LDATIM ,  LE_CDATIM , units = "days") %>%  as.numeric() ) %>% 
+  #   arrange(desc(diff_cdat_end)) %>%  #ungroup() %>% 
+  #   mutate( FT_LDATIM =  ifelse ( diff_cdat_end > 3 , ymd_hms( LE_CDATIM), ymd_hms(FT_LDATIM)) )
+  # 
+  # 
+  # eflalo %>% filter ( FT_REF %in% c( '610837089', '610819824') )
+  # options  ( tibble.width = 100 )
+  # 
+  # # If there are overlapping trips, remove them from 'eflalo' and save them to a file
+  # if (nrow(overlapping.trips) > 0) {
+  #   eflalo <- eflalo[!eflalo$FT_REF %in% overlapping.trips$FT, ]
+  #   
+  #   print("THERE ARE OVERLAPPING TRIPS IN THE DATASET -> SEE THE FILE overlappingTrips SAVED IN THE RESULTS FOLDER")
+  #   
+  #   save(overlapping.trips, file = file.path(outPath, paste0("overlappingTrips", year, ".RData")))
+  # } 
+  # 
+  # eflalo %>% filter(FT_REF == 610917780)
+  # tacsat %>% filter(FT_REF == 610917780)
+  # 
+  # focus_trip <- overlapping.trips %>% filter(FT == 610917780)
+  # 
+  # # Calculate the number of remaining records and the percentage of records removed
+  # num_records <- nrow(eflalo)
+  # percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
+  # 
+  # # Update the remrecsEflalo data frame with these values
+  # remrecsEflalo["overlappingTrips",] <- c(num_records, (100 + percent_removed))
   
   
   
@@ -397,24 +453,24 @@ for(year in yearsToSubmit){
   
   ### 1.4.1 Check Metier L4 (Gear) categories are accepted -----------------------
   
-  m4_ices         <-  getCodeList("GearType")
-  table ( eflalo$LE_GEAR %in%m4_ices$Key )   # TRUE records accepted in DATSU, FALSE aren't
-  
-  # Get summary  of   DATSU valid/not valid records
-  eflalo [ ! eflalo$LE_GEAR %in%m4_ices$Key,]%>%group_by(LE_GEAR)%>%dplyr::select(LE_GEAR)%>%tally()
-  
-  # Correct or dismiss not valid records (if any) and filter only valid ones
-  
-  eflalo      <-  eflalo%>%filter(LE_GEAR %in% m4_ices$Key)
-  
-  
-  # Calculate the number of remaining records and the percentage of records removed
-  num_records <- nrow(eflalo)
-  percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
-  
-  
-  # Add to remrecsEflalo
-  remrecsEflalo["MetierL4_LE_GEAR",] <- c(nrow(eflalo), nrow(eflalo)/as.numeric(remrecsEflalo["Total","RowsRemaining"])*100)
+  # m4_ices         <-  getCodeList("GearType")
+  # table ( eflalo$LE_GEAR %in%m4_ices$Key )   # TRUE records accepted in DATSU, FALSE aren't
+  # 
+  # # Get summary  of   DATSU valid/not valid records
+  # eflalo [ ! eflalo$LE_GEAR %in%m4_ices$Key,]%>%group_by(LE_GEAR)%>%dplyr::select(LE_GEAR)%>%tally()
+  # 
+  # # Correct or dismiss not valid records (if any) and filter only valid ones
+  # 
+  # eflalo      <-  eflalo%>%filter(LE_GEAR %in% m4_ices$Key)
+  # 
+  # 
+  # # Calculate the number of remaining records and the percentage of records removed
+  # num_records <- nrow(eflalo)
+  # percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
+  # 
+  # 
+  # # Add to remrecsEflalo
+  # remrecsEflalo["MetierL4_LE_GEAR",] <- c(nrow(eflalo), nrow(eflalo)/as.numeric(remrecsEflalo["Total","RowsRemaining"])*100)
   
   
   
@@ -422,23 +478,23 @@ for(year in yearsToSubmit){
   
   ### 3.5.5 Check Metier L6 (Fishing Activity) categories are accepted -----------
   
-  m6_ices         <-  getCodeList("Metier6_FishingActivity")
-  
-  table ( eflalo$LE_MET %in%m6_ices$Key )   # TRUE records accepted in DATSU, FALSE aren't
-  
-  # Get summary  of   DATSU valid/not valid records
-  eflalo [ ! eflalo$LE_MET  %in%m6_ices$Key,]%>%group_by(LE_MET)%>%dplyr::select(LE_MET)%>%tally()
-  
-  # Correct them if any not valid and filter only valid ones
-  eflalo      <-  eflalo%>%filter(LE_MET %in% m6_ices$Key)
-  
-  # Calculate the number of remaining records and the percentage of records removed
-  num_records <- nrow(eflalo)
-  percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
-  
-  
-  # Add to remrecsEflalo
-  remrecsEflalo["MetierL6_LE_MET",] <- c(nrow(eflalo), nrow(eflalo)/as.numeric(remrecsEflalo["Total","RowsRemaining"])*100)
+  # m6_ices         <-  getCodeList("Metier6_FishingActivity")
+  # 
+  # table ( eflalo$LE_MET %in%m6_ices$Key )   # TRUE records accepted in DATSU, FALSE aren't
+  # 
+  # # Get summary  of   DATSU valid/not valid records
+  # eflalo [ ! eflalo$LE_MET  %in%m6_ices$Key,]%>%group_by(LE_MET)%>%dplyr::select(LE_MET)%>%tally()
+  # 
+  # # Correct them if any not valid and filter only valid ones
+  # eflalo      <-  eflalo%>%filter(LE_MET %in% m6_ices$Key)
+  # 
+  # # Calculate the number of remaining records and the percentage of records removed
+  # num_records <- nrow(eflalo)
+  # percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
+  # 
+  # 
+  # # Add to remrecsEflalo
+  # remrecsEflalo["MetierL6_LE_MET",] <- c(nrow(eflalo), nrow(eflalo)/as.numeric(remrecsEflalo["Total","RowsRemaining"])*100)
   
   
   
@@ -469,7 +525,6 @@ rm(harbours, harbours_alt, ICESareas, tacsat_name, eflalo_name, tacsat, eflalo, 
    ia, overs, tacsatx, coords, invalid_positions, 
    trip_id, percent_removed, num_records, idx, dt1, result, overlapping.trips)
 rm(list = ls(pattern = "_20"))
-
 
 
 #'------------------------------------------------------------------------------

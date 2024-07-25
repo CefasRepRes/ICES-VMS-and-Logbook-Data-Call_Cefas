@@ -6,6 +6,22 @@
 #'
 #'
 #
+<<<<<<< HEAD
+=======
+
+setwd("C:/Users/MD09/OneDrive - CEFAS/projects/datacalls/ices/2024")
+
+source("C:\\Users\\MD09\\Documents\\git\\ICES-VMS-and-Logbook-Data-Call_Cefas\\global-subset.R")
+
+year = 2023
+
+load(file = paste0(outPath, paste0("/cleanEflalo", year,".RData")))
+load(file = paste0(outPath, paste0("/tacsatp", year,".RData")))
+load(file = paste0(outPath, paste0("/tacsatEflalo", year,".RData")))
+
+
+
+>>>>>>> 48c54449d14930ce1275ed53b83c8102d0c49585
 # Calculate time interval between points
 tacsatp <- intvTacsat(tacsatp, level = "trip", fill.na = TRUE)
 
@@ -84,6 +100,12 @@ speedarr$max <- rep(6, nrow(speedarr))
 subTacsat <- subset(tacsatp, LE_GEAR %in% autoDetectionGears)
 nonsubTacsat <- subset(tacsatp, !LE_GEAR %in% autoDetectionGears)
 
+<<<<<<< HEAD
+=======
+
+
+
+>>>>>>> 48c54449d14930ce1275ed53b83c8102d0c49585
 if (visualInspection == TRUE){
   storeScheme <-
     ac.tac.anal(
@@ -91,7 +113,11 @@ if (visualInspection == TRUE){
       units = "year",
       analyse.by = "LE_L5MET",
       identify = "means")
+<<<<<<< HEAD
 }else  {
+=======
+} else  {
+>>>>>>> 48c54449d14930ce1275ed53b83c8102d0c49585
   storeScheme <-
     expand.grid(
       years = year,
@@ -99,7 +125,11 @@ if (visualInspection == TRUE){
       weeks = 0,
       analyse.by = unique(subTacsat[,"LE_L5MET"])
     )
+<<<<<<< HEAD
   
+=======
+
+>>>>>>> 48c54449d14930ce1275ed53b83c8102d0c49585
   storeScheme$peaks <- NA
   storeScheme$means <- NA
   storeScheme$fixPeaks <- FALSE
@@ -134,6 +164,10 @@ if (visualInspection == TRUE){
 
 #  acTa <- ac.tac.anal(subTacsat, units = "year", storeScheme = storeScheme, analyse.by = "LE_L5MET", identify = "peaks")
 
+<<<<<<< HEAD
+=======
+## doesnt work currently
+>>>>>>> 48c54449d14930ce1275ed53b83c8102d0c49585
 acTa <-
   act.tac(
     subTacsat,
@@ -163,19 +197,37 @@ write.table(summary_table, file = file.path(outPath, "fishing_speeds_by_metier_a
             append = TRUE, sep = "\t", row.names = FALSE, col.names = !file.exists(file.path(outPath, "fishing_speeds_by_metier_and_year.txt")))
 cat("\n", file = file.path(outPath, "fishing_speeds_by_metier_and_year.txt"), append = TRUE)
 
+<<<<<<< HEAD
 for (iGear in autoDetectionGears) {
   subDat <- subset(subTacsat, LE_GEAR == iGear)
   
   # Check if there are non-missing values for "s" state
   if (any(!is.na(subDat$SI_SP[which(subDat$SI_STATE == "s")]))) {
     minS <- min(subDat$SI_SP[which(subDat$SI_STATE == "s")], na.rm = TRUE)
+=======
+unique(subTacsat$LE_GEAR)
+
+for (iGear in autoDetectionGears) {
+  subDat <- subset(subTacsat, LE_GEAR == iGear)
+  
+  unique(subDat$SI_STATE)
+  
+  # Check if there are non-missing values for "s" state
+  if (any(!is.na(subDat$SI_SP[which(subDat$SI_STATE == "0")]))) {
+    minS <- min(subDat$SI_SP[which(subDat$SI_STATE == "0")], na.rm = TRUE)
+>>>>>>> 48c54449d14930ce1275ed53b83c8102d0c49585
   } else {
     minS <- Inf  # or assign a default value or handle the case accordingly
   }
   
   # Check if there are non-missing values for "f" state
+<<<<<<< HEAD
   if (any(!is.na(subDat$SI_SP[which(subDat$SI_STATE == "f")]))) {
     minF <- min(subDat$SI_SP[which(subDat$SI_STATE == "f")], na.rm = TRUE)
+=======
+  if (any(!is.na(subDat$SI_SP[which(subDat$SI_STATE == "1")]))) {
+    minF <- min(subDat$SI_SP[which(subDat$SI_STATE == "1")], na.rm = TRUE)
+>>>>>>> 48c54449d14930ce1275ed53b83c8102d0c49585
   } else {
     minF <- Inf  # or assign a default value or handle the case accordingly
   }
@@ -201,7 +253,7 @@ subTacsat <-
 # Assign for visually inspected gears a simple speed rule classification =============== 
 
 
-
+ 
 metiers <- unique(nonsubTacsat$LE_l5MET)
 nonsubTacsat$SI_STATE <- NA
 for (mm in metiers) {
