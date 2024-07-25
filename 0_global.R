@@ -17,7 +17,7 @@ rm(list=ls())
 ## Download and install required packages which are not available via CRAN
 
 # Install devtools from CRAN
-install.packages("devtools")
+#install.packages("devtools")
 
 ## Download and install the library required to interact with the ICES SharePoint site
 library(devtools)
@@ -66,7 +66,7 @@ dir.create(plotPath, showWarnings = T)
 
 # Setting thresholds
 spThres       <- 20   # Maximum speed threshold in analyses in nm
-intThres      <- 5    # Minimum difference in time interval in minutes to prevent pseudo duplicates
+intThres      <- 3    # Minimum difference in time interval in minutes to prevent pseudo duplicates
 intvThres     <- 240  # Maximum difference in time interval in minutes to prevent unrealistic intervals
 lanThres      <- 1.5  # Maximum difference in log10-transformed sorted weights
 
@@ -1079,6 +1079,8 @@ trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
   
   tz <- data.table(tacsatp)[FT_REF  %in% tst[V1>1]$FT_REF]
   suppressWarnings(tz[, (col) := NULL])
+  
+  
   if(trust_logbook){
     
     ## First bind by landing date

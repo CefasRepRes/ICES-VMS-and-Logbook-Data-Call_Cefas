@@ -76,6 +76,7 @@ for(year in yearsToSubmit){
   }
   
   #Set catch date to be equal to SI_DATE 
+  ## THIS IS ONLY A REQUIREMENT FOR RUN SPLITAMONGPINGS2 
   tacsatp$LE_CDAT <- tacsatp$SI_DATE
   
   tacsatp <- as.data.frame(tacsatp)
