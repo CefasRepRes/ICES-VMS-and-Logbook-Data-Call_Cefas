@@ -408,7 +408,7 @@ for(year in yearsToSubmit){
   )
   message("Cleaning eflalo completed for year ", year)
   print(remrecsEflalo)
-} 
+
 
 
 
@@ -623,8 +623,7 @@ for(year in yearsToSubmit){
   
 
 
- 
-
+} 
  
 
 
