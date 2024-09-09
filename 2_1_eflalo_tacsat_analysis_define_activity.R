@@ -1,13 +1,13 @@
 
 
 #'----------------------------------------------------------------------------
-# 2.1.4 Define activity                                                   ----
+# 2.1.4 Define VMS Records Fishing Activity                               ----
 #'----------------------------------------------------------------------------
 #'
-#'
+#' This is an ad-hoc analysis to be run when the spped profiles methods are reviewed.
+#' The speed profiles resulting of this analysis requires to be checked against ground-truth data such observers data 
 #
-<<<<<<< HEAD
-=======
+ 
 
 setwd("C:/Users/MD09/OneDrive - CEFAS/projects/datacalls/ices/2024")
 
@@ -16,22 +16,35 @@ source("C:\\Users\\MD09\\Documents\\git\\ICES-VMS-and-Logbook-Data-Call_Cefas\\g
 year = 2023
 
 load(file = paste0(outPath, paste0("/cleanEflalo", year,".RData")))
-load(file = paste0(outPath, paste0("/tacsatp", year,".RData")))
-load(file = paste0(outPath, paste0("/tacsatEflalo", year,".RData")))
+load(file = paste0(outPath, paste0("/cleanTacsat", year,".RData")))
+load(file = paste0(outPath, paste0("/tacsatMerged", year,".RData")))
+
+## Calculate SI_YEAR field with teh year in SI_DATIM
+
+tacsatp = tacsatp  |>  mutate ( SI_YEAR = lubridate::year( SI_DATIM )  ) 
 
 
 
->>>>>>> 48c54449d14930ce1275ed53b83c8102d0c49585
-# Calculate time interval between points
-tacsatp <- intvTacsat(tacsatp, level = "trip", fill.na = TRUE)
+ 
+# Calculate time interval between points (NA :: CEFAS DOES IN GEOGFISH GDB )
+ ## tacsatp <- intvTacsat(tacsatp, level = "trip", fill.na = TRUE)
 
-# Reset values that are simply too high to 2x the regular interval rate  
-tacsatp$INTV[tacsatp$INTV > intvThres] <- 2 * intvThres
+# Reset values that are simply too high to 2x the regular interval rate   
+# ( CEFAS DOES HAVE THE INTV in HOURS so transform intvthres in hours ) 
+
+   tacsatp$INTV[tacsatp$INTV > intvThres/60   ] = 1.5 * ( intvThres/60 ) 
+   
+    tacsatp |> filter ( INTV > 6 ) |>  arrange(desc(INTV)) |> pull(INTV)
 
 # Assume that pings with NA in INTV has the normal interval value
-tacsatp$INTV[is.na(tacsatp$INTV)] <- intvThres
+
+    tacsatp$INTV[is.na(tacsatp$INTV)] <- intvThres/60
 
 # Remove points with NA's in them in critical places
+    
+  dim(tacsatp)
+    
+    
 idx <-
   which(
     is.na(tacsatp$VE_REF) == TRUE |
@@ -53,6 +66,7 @@ if (length(idx) > 0) {
 # Create a histogram of speeds for different gears
 # Start a new PNG device
 # Create a histogram of speeds for different gears
+
 diag.plot <- ggplot(data = tacsatp, aes(SI_SP)) +
   geom_histogram(aes(fill = LE_GEAR), breaks = seq(0, 20, by = 1), color = "white") +
   facet_wrap(~ LE_GEAR, ncol = 4, scales = "free_y") +
@@ -78,6 +92,7 @@ ggsave(diag.plot, filename = file.path(outPath, paste0("SpeedHistogram_", year, 
 diag.plot
 
 # start by correctly formatting the level 5 metier
+
 tacsatp$LE_L5MET <-  sapply(strsplit(tacsatp$LE_MET, "_"), function(x) paste(x[1:2], collapse = "_"))  
 
 # Create a data frame with minimum and maximum speed thresholds for each gear
@@ -100,12 +115,8 @@ speedarr$max <- rep(6, nrow(speedarr))
 subTacsat <- subset(tacsatp, LE_GEAR %in% autoDetectionGears)
 nonsubTacsat <- subset(tacsatp, !LE_GEAR %in% autoDetectionGears)
 
-<<<<<<< HEAD
-=======
 
-
-
->>>>>>> 48c54449d14930ce1275ed53b83c8102d0c49585
+ 
 if (visualInspection == TRUE){
   storeScheme <-
     ac.tac.anal(
@@ -113,11 +124,9 @@ if (visualInspection == TRUE){
       units = "year",
       analyse.by = "LE_L5MET",
       identify = "means")
-<<<<<<< HEAD
+ 
 }else  {
-=======
-} else  {
->>>>>>> 48c54449d14930ce1275ed53b83c8102d0c49585
+ 
   storeScheme <-
     expand.grid(
       years = year,
@@ -125,11 +134,7 @@ if (visualInspection == TRUE){
       weeks = 0,
       analyse.by = unique(subTacsat[,"LE_L5MET"])
     )
-<<<<<<< HEAD
-  
-=======
-
->>>>>>> 48c54449d14930ce1275ed53b83c8102d0c49585
+ 
   storeScheme$peaks <- NA
   storeScheme$means <- NA
   storeScheme$fixPeaks <- FALSE
@@ -164,20 +169,48 @@ if (visualInspection == TRUE){
 
 #  acTa <- ac.tac.anal(subTacsat, units = "year", storeScheme = storeScheme, analyse.by = "LE_L5MET", identify = "peaks")
 
-<<<<<<< HEAD
-=======
-## doesnt work currently
->>>>>>> 48c54449d14930ce1275ed53b83c8102d0c49585
+
+save(
+  storeScheme,
+  file = file.path(outPath, paste0("storeschema_2023", year, ".RData")))
+
+load (file = file.path(outPath, paste0("storeschema_2023", year, ".RData") ) ) 
+
+ 
+## Filter the storeScheme for the given year 
+
+storeScheme_year = storeScheme |> filter ( years == year)
+ 
+sub_subTacsat = subTacsat  |>
+                filter (LE_L5MET %in% unique(storeScheme_year   |> select(analyse.by) |> pull() ) )  |> 
+                filter(SI_YEAR == year )
+
+
+nonsub_subTacsat = subTacsat  |> 
+                   filter (! LE_L5MET %in% unique(storeScheme_2023  |> select(analyse.by) |> pull() ) ) 
+
+
 acTa <-
   act.tac(
-    subTacsat,
+    sub_subTacsat |> filter(SI_YEAR == 2023) ,
     units = "year",
     analyse.by = "LE_L5MET",
-    storeScheme = storeScheme,
-    plot = TRUE,
+    storeScheme = storeScheme_2023 |>  filter (analyse.by %in% unique(subTacsat$LE_L5MET) ) ,
+    plot = FALSE,
     level = "all")
-subTacsat$SI_STATE <- acTa
-subTacsat$ID <- 1:nrow(subTacsat)
+
+tt =  ( sub_subTacsat |> filter(SI_YEAR == 2023) ) |>  as.data.frame()
+ tt[lubridate::year( tt$SI_DATIM )  == 2024,  ] 
+
+
+ 
+ if ( dim (nonsub_subTacsat)[1]  > 0  )  nonsubTacsat =  rbind(  nonsub_subTacsat , nonsubTacsat ) 
+ 
+ subTacsat =     sub_subTacsat  
+ subTacsat$SI_STATE <- acTa
+ 
+ 
+  
 
 # Check results, and if results are not satisfactory, run analyses again but now with fixed peaks # 
 
@@ -185,11 +218,23 @@ summary_table <- subTacsat %>%
   filter(SI_STATE == "f") %>%
   group_by(LE_L5MET) %>%
   dplyr::summarise(
+    min  = min(SI_SP),
+    max  = max(SI_SP)
+  )
+
+summary_table <- subTacsat %>%
+  filter(SI_STATE == "h") %>%
+  group_by(LE_L5MET) %>%
+  dplyr::summarise(
     min_SI_SP = min(SI_SP),
     max_SI_SP = max(SI_SP)
   )
-print(summary_table)
+
+print(summary_table |> as.data.frame())
+write.table( summary_table |> as.data.frame() ,"clipboard",sep="\t",row.names= FALSE  )    
 message(paste("These are your maximum and minimum fishing speeds (in knots), as defined by the autodetection algorithm, for ", year, ". Check they look realistic!", sep  =""))
+
+ 
 
 # Write the summary table to a text file
 cat("\n\nYear:", year, "\n", file = file.path(outPath, "fishing_speeds_by_metier_and_year.txt"), append = TRUE)
@@ -197,85 +242,115 @@ write.table(summary_table, file = file.path(outPath, "fishing_speeds_by_metier_a
             append = TRUE, sep = "\t", row.names = FALSE, col.names = !file.exists(file.path(outPath, "fishing_speeds_by_metier_and_year.txt")))
 cat("\n", file = file.path(outPath, "fishing_speeds_by_metier_and_year.txt"), append = TRUE)
 
-<<<<<<< HEAD
-for (iGear in autoDetectionGears) {
-  subDat <- subset(subTacsat, LE_GEAR == iGear)
-  
-  # Check if there are non-missing values for "s" state
-  if (any(!is.na(subDat$SI_SP[which(subDat$SI_STATE == "s")]))) {
-    minS <- min(subDat$SI_SP[which(subDat$SI_STATE == "s")], na.rm = TRUE)
-=======
-unique(subTacsat$LE_GEAR)
 
-for (iGear in autoDetectionGears) {
-  subDat <- subset(subTacsat, LE_GEAR == iGear)
-  
-  unique(subDat$SI_STATE)
-  
-  # Check if there are non-missing values for "s" state
-  if (any(!is.na(subDat$SI_SP[which(subDat$SI_STATE == "0")]))) {
-    minS <- min(subDat$SI_SP[which(subDat$SI_STATE == "0")], na.rm = TRUE)
->>>>>>> 48c54449d14930ce1275ed53b83c8102d0c49585
-  } else {
-    minS <- Inf  # or assign a default value or handle the case accordingly
-  }
-  
-  # Check if there are non-missing values for "f" state
-<<<<<<< HEAD
-  if (any(!is.na(subDat$SI_SP[which(subDat$SI_STATE == "f")]))) {
-    minF <- min(subDat$SI_SP[which(subDat$SI_STATE == "f")], na.rm = TRUE)
-=======
-  if (any(!is.na(subDat$SI_SP[which(subDat$SI_STATE == "1")]))) {
-    minF <- min(subDat$SI_SP[which(subDat$SI_STATE == "1")], na.rm = TRUE)
->>>>>>> 48c54449d14930ce1275ed53b83c8102d0c49585
-  } else {
-    minF <- Inf  # or assign a default value or handle the case accordingly
-  }
-  
-  if (minS < minF) {
-    storeScheme$fixPeaks[which(storeScheme$analyse.by == iGear)] <- TRUE
-    subacTa <- activityTacsat(
-      subDat,
-      units = "year",
-      analyse.by = "LE_GEAR",
-      storeScheme,
-      plot = FALSE,
-      level = "all"
-    )
-    subTacsat$SI_STATE[subDat$ID] <- subacTa
-  }
-}  
-subTacsat <-
-  subTacsat[,
-            -rev(grep("ID", colnames(subTacsat)))[1]
-  ]
+# subTacsat <-
+#   subTacsat[,
+#             -rev(grep("ID", colnames(subTacsat)))[1]
+#   ]
+ 
+# unique(subTacsat$LE_GEAR)
+# 
+# 
+# 
+# for (iGear in autoDetectionGears) {
+#   
+#   subDat <- subset(subTacsat, LE_GEAR == iGear)
+#   
+#   unique(subDat$SI_STATE)
+#   
+#   # Check if there are non-missing values for "s" state
+#   if (any(!is.na(subDat$SI_SP[which(subDat$SI_STATE == "0")]))) {
+#     minS <- min(subDat$SI_SP[which(subDat$SI_STATE == "0")], na.rm = TRUE)
+#  
+#   } else {
+#     minS <- Inf  # or assign a default value or handle the case accordingly
+#   }
+#   
+#   # Check if there are non-missing values for "f"/ 1 state
+#  
+#   if (any(!is.na(subDat$SI_SP[which(subDat$SI_STATE == "1")]))) {
+#     
+#     minF <- min(subDat$SI_SP[which(subDat$SI_STATE == "1")], na.rm = TRUE)
+#  
+#   } else {
+#     minF <- Inf  # or assign a default value or handle the case accordingly
+#   }
+#   
+#   if (minS < minF) {
+#     storeScheme$fixPeaks[which(storeScheme$analyse.by == iGear)] <- TRUE
+#     
+#     subacTa <- activityTacsat(
+#       subDat,
+#       units = "year",
+#       analyse.by = "LE_GEAR",
+#       storeScheme,
+#       plot = FALSE,
+#       level = "all"
+#     )
+#     subTacsat$SI_STATE[subDat$ID] <- subacTa
+#   }
+# }  
+# 
+# 
+# 
+# subTacsat <-
+#   subTacsat[,
+#             -rev(grep("ID", colnames(subTacsat)))[1]
+#   ]
 
 # Assign for visually inspected gears a simple speed rule classification =============== 
 
-
+### Apply 
  
-metiers <- unique(nonsubTacsat$LE_l5MET)
+metiers <- unique(nonsubTacsat$LE_L5MET)
+speedarr_nonsubtacsat = speedarr |> filter (LE_L5MET %in% metiers )
+speedarr_nonsubtacsat$min = 0
+speedarr_nonsubtacsat$max = 1.5
+speedarr_nonsubtacsat[grep("FPO",speedarr_nonsubtacsat$LE_L5MET ), 'min'] = 0.5
+speedarr_nonsubtacsat[grep("FPO",speedarr_nonsubtacsat$LE_L5MET ), 'max'] = 3
 nonsubTacsat$SI_STATE <- NA
+
 for (mm in metiers) {
   nonsubTacsat$SI_STATE[
-    nonsubTacsat$LE_GEAR == mm &
-      nonsubTacsat$SI_SP >= speedarr[speedarr$LE_GEAR == mm, "min"] &
-      nonsubTacsat$SI_SP <= speedarr[speedarr$LE_GEAR == mm, "max"]
+    nonsubTacsat$LE_L5MET == mm &
+      nonsubTacsat$SI_SP >= speedarr_nonsubtacsat[speedarr_nonsubtacsat$LE_L5MET == mm, "min"] &
+      nonsubTacsat$SI_SP <= speedarr_nonsubtacsat[speedarr_nonsubtacsat$LE_L5MET == mm, "max"]
   ] <- "f";
 }
+
+
 nonsubTacsat$SI_STATE[
   nonsubTacsat$LE_GEAR == "NA" &
-    nonsubTacsat$SI_SP >= speedarr[speedarr$LE_GEAR == "MIS", "min"] &
-    nonsubTacsat$SI_SP <= speedarr[speedarr$LE_GEAR == "MIS", "max"]
+    nonsubTacsat$SI_SP >= 1 &
+    nonsubTacsat$SI_SP <= 6
 ] <- "f"
 nonsubTacsat$SI_STATE[ is.na(nonsubTacsat$SI_STATE) ] <- "s"
+
+nonsubTacsat |>  filter ( SI_STATE == 's' ) 
 
 
 # Combine the two dataset together again =============== 
 
+ 
 
-tacsatp <- rbindTacsat(subTacsat, nonsubTacsat)
-tacsatp <- orderBy( ~ VE_REF + SI_DATIM, data = tacsatp)
+summary_table |>  mutate ( max = case_when( max <=4  ~ 4.5, 
+                                            between ( max, 4, 4.5 ) ~ 5   , 
+                                            between ( max, 4.5, 5 ) ~ 5.5   , 
+                                            between ( max, 5, 5.5 ) ~ 6 , 
+                                            between ( max, 5.5, 6 ) ~ 6.5, 
+                                            between ( max, 6, 6.5 ) ~ 6.75,
+                                            max >=6.5 ~7 ,
+                                            .default = max  )  )  |>
+                  mutate ( min = case_when( min <= 1  ~ 1, 
+                                            between ( min, 1, 1.5 ) ~ 1.25   , 
+                                            between ( min, 1.5, 4 ) ~ 1.5    ,
+                                            .default = min  )  )
+
+speedarr_met5 = bind_rows ( summary_table , speedarr_nonsubtacsat     )  |> as.data.frame()
+
+
+write.table( speedarr_met5 |> as.data.frame() ,"clipboard",sep="\t",row.names= FALSE  )    
+
 
 # This next step is retained from previous code. The new function to assign
 # fishing activity states does not use "h" (harbour), but if you are using your

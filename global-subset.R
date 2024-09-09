@@ -3,6 +3,7 @@ library(lubridate)
 library(doBy)
 library(data.table)
 library(icesVocab)
+library(icesSharePoint)
 library(RPostgres)
 library(RPostgreSQL)
 library(DBI)
@@ -14,7 +15,7 @@ library(sf)
 library(ggplot2)
 library(tcltk)
 
-setwd("C:/Users/MD09/OneDrive - CEFAS/projects/datacalls/ices/2024")
+#setwd("C:/Users/MD09/OneDrive - CEFAS/projects/datacalls/ices/2024")
 
 year <- 2023
 yearsToSubmit <- 2023
@@ -22,8 +23,16 @@ yearsToSubmit <- 2023
 
 # Set paths
 path <- paste0(getwd(), "/") # Working directory
+datapath <- paste0('Y:\\FISHERIES M MoU\\Working_Area\\spatial_fisheries_data\\ices_datacalls\\ices_vms_lb_datacall_2024\\data') # Data  directory
+
+
 codePath  <- paste0(path, "Scripts/")   # Location to store R scripts
 dataPath  <- paste0(path, "Data/")      # Location to store tacsat (VMS) and eflalo (logbook) data
+
+dataPath <- paste0('Y:\\FISHERIES M MoU\\Working_Area\\spatial_fisheries_data\\ices_datacalls\\ices_vms_lb_datacall_2024\\data\\input_data') # Data  directory
+intoutPath  <- paste0('Y:\\FISHERIES M MoU\\Working_Area\\spatial_fisheries_data\\ices_datacalls\\ices_vms_lb_datacall_2024\\data\\output_data') # Data  directory
+outPath <- paste0('Y:\\FISHERIES M MoU\\Working_Area\\spatial_fisheries_data\\ices_datacalls\\ices_vms_lb_datacall_2024\\data\\results') # Data  directory
+
 outPath   <- paste0(path, "Results/")   # Location to store the results
 plotPath  <- paste0(path, "Plots/") 
 
@@ -33,21 +42,25 @@ dir.create(dataPath, showWarnings = T)
 dir.create(outPath, showWarnings = T)
 dir.create(plotPath, showWarnings = T)
 
-# if(!file.exists(paste0(dataPath, "hab_and_bathy_layers.zip"))){
-#   
-#   # Download the zip file
-#   icesSharePoint::spgetfile(file = "SEAwise Documents/hab_and_bathy_layers.zip", site = "/ExpertGroups/DataExpports/VMS_Data_call", destdir = dataPath)
-#   ## The first time you run this code you will be prompted to enter your ICES Sharepoint password. Type it in the pop-up window to proceed with the download
-#   
-#   
-#   # Extract the zip archive
-#   unzip(paste0(dataPath, "hab_and_bathy_layers.zip"), exdir = dataPath, overwrite = TRUE, junkpaths = TRUE)
-# }
-# 
-# eusm <- readRDS(paste0(dataPath, "eusm.rds"))
-# eusm <- eusm %>% st_transform(4326)
-# bathy <- readRDS(paste0(dataPath, "ICES_GEBCO.rds"))
-# bathy <- bathy %>% st_set_crs(4326)
+
+
+ 
+
+if(!file.exists(paste0(dataPath, "hab_and_bathy_layers.zip"))){
+   
+  # Download the zip file
+  ## icesSharePoint::spgetfile(file = "SEAwise Documents/hab_and_bathy_layers.zip", site = "/ExpertGroups/DataExpports/VMS_Data_call", destdir = dataPath)
+  ## The first time you run this code you will be prompted to enter your ICES Sharepoint password. Type it in the pop-up window to proceed with the download
+
+
+# Extract the zip archive
+ unzip(paste0(dataPath, "hab_and_bathy_layers.zip"), exdir = dataPath, overwrite = TRUE, junkpaths = TRUE)
+}
+
+eusm <- readRDS(paste0(dataPath, "eusm.rds"))
+eusm <- eusm %>% st_transform(4326)
+bathy <- readRDS(paste0(dataPath, "ICES_GEBCO.rds"))
+bathy <- bathy %>% st_set_crs(4326)
 
 #'------------------------------------------------------------------------------
 # 0.2 Settings for analysis                                                 ----
@@ -218,8 +231,9 @@ valid_metiers <- fread("https://raw.githubusercontent.com/ices-eg/RCGs/master/Me
 
 
 # Define a function to assign tripnumber to Tacsat data
+
+
 trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
-  
   
   
   if(col == "LE_MET"){
@@ -237,11 +251,18 @@ trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
   e <- data.table(eflalo)[FT_REF %in% tst[V1>1]$FT_REF]
   
   tz <- data.table(tacsatp)[FT_REF  %in% tst[V1>1]$FT_REF]
-  suppressWarnings(tz[, (col) := NULL])
   
-  eflalo_u_col = eflalo[eflalo$FT_REF %!in% e$FT_REF,] %>%  distinct (FT_REF, LE_GEAR )
-  tacsatp_u_col =  tacsatp |> 
-    left_join(eflalo_u_col, by = c("FT_REF" = "FT_REF"), relationship = "many-to-many")
+  tz[, (col) := NULL]
+  
+  dim(tacsatp)
+  
+  #unique(tacsatp) %>%  as.data.frame()
+  
+   
+  
+  # eflalo_u_col = eflalo[eflalo$FT_REF %!in% e$FT_REF,] %>%  distinct (FT_REF, LE_GEAR )
+  # tacsatp_u_col =  tacsatp |> 
+  #   inner_join(eflalo_u_col, by = c("FT_REF" = "FT_REF"), relationship = "many-to-many")
   
   
   if(trust_logbook){
@@ -249,12 +270,17 @@ trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
     ## First bind by landing date
     
     e2 <- e[,.(get(col)[length(unique(get(col))) == 1]), by = .(FT_REF, LE_CDAT)]
+    
     names(e2) <- c("FT_REF", "LE_CDAT", col)
     
-    tz <- tz |> 
-      left_join(e2, by = c("FT_REF" = "FT_REF", "SI_DATE" = "LE_CDAT"), relationship = "many-to-many")
+    e2 = unique ( e2)
     
-    tz <- unique(tz) %>%  as.data.frame()
+    tz1 <- tz |> 
+      left_join(e2, by = c("FT_REF" = "FT_REF", "SI_DATE" = "LE_CDAT"))
+    
+    tz2 <- unique(tz1) %>%  as.data.frame()
+    
+    
     
     #If some are still missing, use haul information  ( LE_SDATIM , LE_EDATIM) to get the closest time
     #   if(nrow(tz[is.na(get(col))]) > 0){ 
@@ -312,10 +338,11 @@ trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
     
     # Bind to the category with most value
     
-    if(nrow(tz %>%  filter ( is.na ( LE_GEAR))) > 0){
+    if( nrow(tz2 %>%  filter ( is.na ( get(col)  ))) > 0  ){
       
-      ft_ref_isna = tz %>%  filter ( is.na ( LE_GEAR)) %>%  distinct(FT_REF) %>% pull()
-      tz2 = tz %>%  filter ( FT_REF %in% ft_ref_isna ) %>%  as.data.frame()
+      ft_ref_isna = tz2 %>%  filter ( is.na ( get(col) )) %>%  distinct(FT_REF) %>% pull()
+      tz3 = tz2 %>%  filter ( FT_REF %in% ft_ref_isna ) %>%  as.data.frame()
+      tz4 = tz3 |> filter ( is.na ( get(col) ) )
       e2 = e %>%  filter ( FT_REF %in% ft_ref_isna )
       
       
@@ -329,139 +356,25 @@ trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
       highvalue <- highvalue[,.(get[which.max(LE_KG_TOT)]), by = .(FT_REF)]
       names(highvalue) <-  c("FT_REF", col)
       
-      tx2 <- tz2 
-      tx2 = tx2 %>%  select ( - any_of( col )  )
-      tz2 <- tx2 %>%  inner_join ( highvalue, by =  "FT_REF")
+      tx4 <- tz4
+      tx5 = tx4 %>%  select ( - any_of( col )  )
+      tz5 <- tx5 %>%  inner_join ( highvalue, by =  "FT_REF")
       
     }
     
     
-    tz =   tz %>%  filter(  !is.na ( LE_GEAR))   
-    tz_all =  rbind (tz , tz2 )  
+    tz_col_na =   tz2 %>%  filter(  !is.na ( get( col) ))   
+    tz_all =  rbind (tz_col_na , tz5 )  
     
     
-    tacsatp_fill <- rbindlist(  list( tacsatp_u_col , tz_all  )    , fill = T)
+    #tacsatp_fill <- rbindlist(  list( tacsatp_u_col , tz_all  )    , fill = T)
     
     
-    return(tacsatp_fill)
+    return(tz_all)
     
   }
   
   
-}
-
-# Define a function to add gear width to metier
-add_gearwidth <- function(x, met_name = "LE_MET", oal_name = "VE_LEN", kw_name = "VE_KW"){
-  
-  require(data.table)
-  require(dplyr)
-  require(sfdSAR)
-  require(icesVMS)
-  
-  setDT(x)
-  ID <- c(oal_name, kw_name)
-  x[,(ID):= lapply(.SD, as.numeric), .SDcols = ID]
-  x[, Metier_level6 := get(met_name)]
-  
-  
-  #Updated metiers
-  metier_lookup <- fread("https://raw.githubusercontent.com/ices-eg/RCGs/master/Metiers/Reference_lists/RDB_ISSG_Metier_list.csv")
-  
-  if(any(x[, get(met_name)] %!in% metier_lookup$Metier_level6))
-    stop(paste("Non valid metiers in tacsatEflalo:", paste(x[x[, get(met_name)] %!in% metier_lookup$Metier_level6][, get(met_name)], collapse = ", ")))
-  
-  gear_widths <- get_benthis_parameters()
-  
-  aux_lookup <- data.table(merge(gear_widths, metier_lookup, by.x = "benthisMet", by.y = "Benthis_metiers", all.y = T))
-  aux_lookup <- aux_lookup[,.(Metier_level6, benthisMet, avKw, avLoa, avFspeed, subsurfaceProp, gearWidth, firstFactor, secondFactor, gearModel, 
-                              gearCoefficient, contactModel)]
-  
-  aux_lookup <<- unique(aux_lookup)
-  
-  
-  aux_lookup <- data.table(merge(gear_widths, metier_lookup, by.x = "benthisMet", by.y = "Benthis_metiers", all.y = T))
-  aux_lookup <- aux_lookup[,.(Metier_level6, benthisMet, avKw, avLoa, avFspeed, subsurfaceProp, gearWidth, firstFactor, secondFactor, gearModel, 
-                              gearCoefficient, contactModel)]
-  
-  aux_lookup[gearCoefficient == "avg_kw", gearCoefficient := kw_name]
-  aux_lookup[gearCoefficient == "avg_oal", gearCoefficient := oal_name]
-  
-  aux_lookup <- unique(aux_lookup)
-  
-  vms <- x |> 
-    left_join(aux_lookup, by = "Metier_level6")
-  
-  vms$gearWidth_model <-
-    predict_gear_width(vms$gearModel, vms$gearCoefficient, vms)
-  
-  if("avg_gearWidth" %!in% names(vms))
-    vms[, avg_gearWidth := NA]
-  
-  
-  gearWidth_filled <-
-    with(vms,
-         ifelse(!is.na(avg_gearWidth), avg_gearWidth,
-                ifelse(!is.na(gearWidth_model), gearWidth_model,
-                       gearWidth)
-         ))
-  
-  return(gearWidth_filled)
-}
-
-
-add_subsurface_swept_area <- function(x, met_name = "LE_MET", oal_name = "VE_LEN", kw_name = "VE_KW", width_name = "GEARWIDTH"){
-  
-  require(data.table)
-  require(dplyr)
-  require(sfdSAR)
-  require(icesVMS)
-  
-  setDT(x)
-  ID <- c(oal_name, kw_name)
-  x[,(ID):= lapply(.SD, as.numeric), .SDcols = ID]
-  x[, Metier_level6 := get(met_name)]
-  
-  
-  #Updated metiers
-  metier_lookup <- fread("https://raw.githubusercontent.com/ices-eg/RCGs/master/Metiers/Reference_lists/RDB_ISSG_Metier_list.csv")
-  
-  if(any(x[, get(met_name)] %!in% metier_lookup$Metier_level6))
-    stop(paste("Non valid metiers in tacsatEflalo:", paste(x[x[, get(met_name)] %!in% metier_lookup$Metier_level6][, get(met_name)], collapse = ", ")))
-  
-  gear_widths <- get_benthis_parameters()
-  
-  aux_lookup <- data.table(merge(gear_widths, metier_lookup, by.x = "benthisMet", by.y = "Benthis_metiers", all.y = T))
-  aux_lookup <- aux_lookup[,.(Metier_level6, benthisMet, avKw, avLoa, avFspeed, subsurfaceProp, gearWidth, firstFactor, secondFactor, gearModel, 
-                              gearCoefficient, contactModel)]
-  
-  aux_lookup <<- unique(aux_lookup)
-  
-  
-  aux_lookup <- data.table(merge(gear_widths, metier_lookup, by.x = "benthisMet", by.y = "Benthis_metiers", all.y = T))
-  aux_lookup <- aux_lookup[,.(Metier_level6, benthisMet, avKw, avLoa, avFspeed, subsurfaceProp, gearWidth, firstFactor, secondFactor, gearModel, 
-                              gearCoefficient, contactModel)]
-  
-  aux_lookup[gearCoefficient == "avg_kw", gearCoefficient := kw_name]
-  aux_lookup[gearCoefficient == "avg_oal", gearCoefficient := oal_name]
-  
-  aux_lookup <- unique(aux_lookup)
-  
-  vms <- x |> 
-    left_join(aux_lookup, by = "Metier_level6")
-  
-  vms$surface <-
-    predict_surface_contact(vms$contactModel,
-                            vms$INTV,
-                            vms$GEARWIDTH,
-                            vms$SI_SP)
-  
-  vms[contactModel == "trawl_contact", surface := surface * 1000]
-  
-  # calculate subsurface contact
-  vms$subsurface <- vms$surface * as.numeric(vms$subsurfaceProp) * .01
-  
-  
-  return(vms$subsurface)
 }
 
 
@@ -1184,4 +1097,317 @@ act.tac <- function (tacsat, units = "year", analyse.by = "LE_L5MET", storeSchem
   cat("Note that in case of 5 peaks: no fishing = h, fishing = f, steaming / no fishing = s\n")
   cat("Note that in case of 3 peaks: fishing = f, steaming / no fishing = s\n")
   return(tacsat$SI_STATE)
+}
+
+
+
+
+## The  overlap_trips function created by Jeppe ICES , remove all trips that were overlapping. 
+## This modified version correct the end and start date of overlapping trips  
+
+
+overlap_trips =   function  ( eflalo   ) { 
+      
+      eflalo <- orderBy(~ VE_COU + VE_REF + FT_DDATIM + FT_LDATIM, data = eflalo)
+      
+      # If a trip (same depart and return times) has more than one FT_REF, make them all into the same (first) FT_REF. 
+      dt1 <- data.table(eflalo)[,.(VE_REF, FT_REF, FT_DDATIM, FT_LDATIM)]
+      
+      dt1 <- unique(dt1, by = c("VE_REF", "FT_REF"))
+      
+      setkey(dt1, VE_REF, FT_DDATIM, FT_LDATIM)
+      dt2 <- dt1[, ref := .N > 1, by = key(dt1)][ref == T]
+      
+      dt3 <- dt2[,.(FT_REF_NEW = FT_REF[1]), by = .(VE_REF, FT_DDATIM, FT_LDATIM)]
+      
+      dt4 <- merge(dt2, dt3)
+      
+      eflalo2 <- merge(data.table(eflalo), dt4, all.x = T)
+      eflalo2[!is.na(FT_REF_NEW), FT_REF := FT_REF_NEW]
+      eflalo2[, FT_REF_NEW := NULL]
+      
+      eflalo <- data.frame(eflalo2)
+      
+      eflalo <- eflalo %>% select(-ref)
+      
+      # Create a data table 'dt1' with the necessary columns from 'eflalo'
+      dt1 <- data.table(ID = eflalo$VE_REF, FT = eflalo$FT_REF,
+                        startdate = eflalo$FT_DDATIM,
+                        enddate = eflalo$FT_LDATIM)
+      
+      # Remove duplicate rows from 'dt1'
+      dt1 <- dt1[!duplicated(paste(dt1$ID, dt1$FT)), ]
+      
+      # Set keys for 'dt1' for efficient joining and overlapping
+      setkey(dt1, ID, startdate, enddate)
+      
+      # Find overlapping trips in 'dt1'
+      result <- foverlaps(dt1, dt1, by.x = c("ID", "startdate", "enddate"),
+                          by.y = c("ID", "startdate", "enddate"))
+      
+      # Filter 'result' to get only the rows where trips overlap
+      overlapping.trips <- subset(result, startdate < i.enddate & enddate > i.startdate & FT != i.FT)
+      
+      # If there are overlapping trips, remove them from 'eflalo' and save them to a file
+      if (nrow(overlapping.trips) > 0) {
+        eflalo <- eflalo[!eflalo$FT_REF %in% overlapping.trips$FT, ]
+        
+        print("THERE ARE OVERLAPPING TRIPS IN THE DATASET -> SEE THE FILE overlappingTrips SAVED IN THE RESULTS FOLDER")
+      }
+
+
+
+return(list (eflalo ,overlapping.trips )  )
+} 
+
+
+### WORK ON PROGRESS: FUNTION TO CORECT THE START AND END DATES OF THE OVERLAPPING FISHING TRIPS
+# 
+# overlap_trips =   function  ( eflalo_df  ) { 
+#   
+#   # Create a data table 'dt1' with the necessary columns from 'eflalo'
+#   
+#   dt1 <- data.table(ID = eflalo$VE_REF, FT = eflalo$FT_REF,
+#                     startdate = eflalo$FT_DDATIM,
+#                     enddate = eflalo$FT_LDATIM)
+#   
+#   # Get only unique  the VE_REF and FT_REF . Remove  duplicate rows from 'dt1'. Due to EFLALO format many EFLALO-P1 rows are duplicated . 
+#   
+#   dt1 <- dt1[!duplicated(paste(dt1$ID, dt1$FT)), ]
+#   
+#   
+#   # Set keys for 'dt1' for efficient joining and overlapping
+#   
+#   setkey(dt1, ID, startdate, enddate)
+#   
+#   # Find overlapping trips in 'dt1' using FOVERLAPS function. The last two columns in both by.x and by.y should each 
+#   # correspond to the start and end interval columns in x and y respectively.
+#   
+#   result <- data.table::foverlaps(dt1, dt1, 
+#                                   by.x = c("ID", "startdate", "enddate"),
+#                                   by.y = c("ID", "startdate", "enddate")   ) 
+#   
+#   # Filter 'result' to get only the rows where trips overlap
+#   overlapping.trips = subset(result, startdate < i.enddate & enddate > i.startdate & FT != i.FT)
+#   
+#   overlapping.trips = orderBy(~ ID +  startdate + enddate, data = overlapping.trips)
+#   
+#   ## ifelse has a problem  with the date formats , so it is used REPLACE function instead
+#   
+#   ## Get the NEW STARTING DATES as THE END DATE OF THE PREVIOUS TRIP and ADD 30 seconds
+#   
+#   overlapping.trips  = overlapping.trips  |>  
+#     mutate  ( tot_FT = FT + i.FT ) |> 
+#     group_by(ID, tot_FT ) |> 
+#     mutate (i.startdate = dplyr::lag ( enddate  )  ) |> 
+#     mutate (  startdate = replace(  i.startdate + dseconds( x= 30)   , is.na ( i.startdate) , startdate  ) )  |> 
+#     ungroup() |> 
+#     select ( ID, FT, startdate, enddate) |> 
+#     ungroup()  |> group_by(ID, FT ) |> 
+#     mutate( u_ft = row_number() ) |> 
+#     filter ( u_ft == 1 ) |>  select ( -u_ft ) |> 
+#     as.data.frame() # |>  filter (ID ==  'A10795'  ) |> 
+#   
+#   ## Discard the trips with recalculated  landing dates before departure date trips 
+#   
+#   idx <- which(overlapping.trips$enddate > overlapping.trips$startdate)
+#   overlapping.trips_corrected =  overlapping.trips[idx,]
+#   
+#   ## Select and update the trips new calculated departure and return dates
+#   
+#   eflalo_corrected = eflalo_df |>
+#     left_join(overlapping.trips_corrected , by =  join_by(FT_REF  == FT , VE_REF == ID)) |> 
+#     mutate ( FT_DDATIM =   lubridate::as_datetime  ( ifelse ( is.na(startdate),
+#                                                               as.character( FT_DDATIM ), 
+#                                                               as.character(startdate)) )  , 
+#              FT_LDATIM =   lubridate::as_datetime  ( ifelse ( is.na(enddate),
+#                                                               as.character( FT_LDATIM ), 
+#                                                               as.character(enddate)) )     )  |> 
+#     select( - startdate,  -enddate)  
+#   
+#   
+#   ## Select the  trips with recalculated  landing dates before departure date trips 
+#   
+#   idx <- which(overlapping.trips$enddate <= overlapping.trips$startdate)
+#   overlapping.trips_erroneus =  overlapping.trips[idx,]
+#   
+#   ## Select the erroneus tips landings reported. There were overlapping trips and when recalcualted 
+#   ## the landing dats is equal or earlier than departure dates
+#   
+#   eflalo_erroneus = eflalo_df  |>
+#     inner_join(overlapping.trips_erroneus , by =  join_by(FT_REF  == FT , VE_REF == ID))   |> 
+#     select( - startdate,  -enddate)  
+#   
+#   return(list (eflalo_corrected ,eflalo_erroneus )  )
+# }
+
+
+
+# Define a function to add gear width to metier
+add_gearwidth <- function(x, met_name = "LE_MET", oal_name = "VE_LEN", kw_name = "VE_KW"){
+  
+  require(data.table)
+  require(dplyr)
+  require(sfdSAR)
+  require(icesVMS)
+  
+  setDT(x)
+  ID <- c(oal_name, kw_name)
+  x[,(ID):= lapply(.SD, as.numeric), .SDcols = ID]
+  x[, Metier_level6 := get(met_name)]
+  
+  
+  #Updated metiers
+  metier_lookup <- fread("https://raw.githubusercontent.com/ices-eg/RCGs/master/Metiers/Reference_lists/RDB_ISSG_Metier_list.csv")
+  
+  if(any(x[, get(met_name)] %!in% metier_lookup$Metier_level6))
+    stop(paste("Non valid metiers in tacsatEflalo:", paste(x[x[, get(met_name)] %!in% metier_lookup$Metier_level6][, get(met_name)], collapse = ", ")))
+  
+  gear_widths <- get_benthis_parameters()
+  
+  aux_lookup <- data.table(merge(gear_widths, metier_lookup, by.x = "benthisMet", by.y = "Benthis_metiers", all.y = T))
+  aux_lookup <- aux_lookup[,.(Metier_level6, benthisMet, avKw, avLoa, avFspeed, subsurfaceProp, gearWidth, firstFactor, secondFactor, gearModel, 
+                              gearCoefficient, contactModel)]
+  
+  aux_lookup <<- unique(aux_lookup)
+  
+  
+  aux_lookup <- data.table(merge(gear_widths, metier_lookup, by.x = "benthisMet", by.y = "Benthis_metiers", all.y = T))
+  aux_lookup <- aux_lookup[,.(Metier_level6, benthisMet, avKw, avLoa, avFspeed, subsurfaceProp, gearWidth, firstFactor, secondFactor, gearModel, 
+                              gearCoefficient, contactModel)]
+  
+  aux_lookup[gearCoefficient == "avg_kw", gearCoefficient := kw_name]
+  aux_lookup[gearCoefficient == "avg_oal", gearCoefficient := oal_name]
+  
+  aux_lookup <- unique(aux_lookup)
+  
+  vms <- x |> 
+    left_join(aux_lookup, by = "Metier_level6")
+  
+  vms$gearWidth_model <-
+    predict_gear_width(vms$gearModel, vms$gearCoefficient, vms)
+  
+  if("avg_gearWidth" %!in% names(vms))
+    vms[, avg_gearWidth := NA]
+  
+  
+  gearWidth_filled <-
+    with(vms,
+         ifelse(!is.na(avg_gearWidth), avg_gearWidth,
+                ifelse(!is.na(gearWidth_model), gearWidth_model,
+                       gearWidth)
+         ))
+  
+  return(gearWidth_filled)
+}
+
+
+
+add_swept_area <- function(x, met_name = "LE_MET", oal_name = "VE_LEN", kw_name = "VE_KW", width_name = "GEARWIDTH"){
+  
+  require(data.table)
+  require(dplyr)
+  require(sfdSAR)
+  require(icesVMS)
+  
+  setDT(x)
+  ID <- c(oal_name, kw_name)
+  x[,(ID):= lapply(.SD, as.numeric), .SDcols = ID]
+  x[, Metier_level6 := get(met_name)]
+  
+  
+  #Updated metiers
+  metier_lookup <- fread("https://raw.githubusercontent.com/ices-eg/RCGs/master/Metiers/Reference_lists/RDB_ISSG_Metier_list.csv")
+  
+  if(any(x[, get(met_name)] %!in% metier_lookup$Metier_level6))
+    stop(paste("Non valid metiers in tacsatEflalo:", paste(x[x[, get(met_name)] %!in% metier_lookup$Metier_level6][, get(met_name)], collapse = ", ")))
+  
+  gear_widths <- get_benthis_parameters()
+  
+  aux_lookup <- data.table(merge(gear_widths, metier_lookup, by.x = "benthisMet", by.y = "Benthis_metiers", all.y = T))
+  aux_lookup <- aux_lookup[,.(Metier_level6, benthisMet, avKw, avLoa, avFspeed, subsurfaceProp, gearWidth, firstFactor, secondFactor, gearModel, 
+                              gearCoefficient, contactModel)]
+  
+  aux_lookup <<- unique(aux_lookup)
+  
+  
+  aux_lookup <- data.table(merge(gear_widths, metier_lookup, by.x = "benthisMet", by.y = "Benthis_metiers", all.y = T))
+  aux_lookup <- aux_lookup[,.(Metier_level6, benthisMet, avKw, avLoa, avFspeed, subsurfaceProp, gearWidth, firstFactor, secondFactor, gearModel, 
+                              gearCoefficient, contactModel)]
+  
+  aux_lookup[gearCoefficient == "avg_kw", gearCoefficient := kw_name]
+  aux_lookup[gearCoefficient == "avg_oal", gearCoefficient := oal_name]
+  
+  aux_lookup <- unique(aux_lookup)
+  
+  vms <- x |> 
+    left_join(aux_lookup, by = "Metier_level6")
+  
+  vms$surface <-
+    predict_surface_contact(vms$contactModel,
+                            vms$INTV,
+                            vms$GEARWIDTH,
+                            vms$SI_SP)
+  
+  vms[contactModel == "trawl_contact", surface := surface * 1000]
+  
+  return(vms$surface)
+}
+
+
+
+
+add_subsurface_swept_area <- function(x, met_name = "LE_MET", oal_name = "VE_LEN", kw_name = "VE_KW", width_name = "GEARWIDTH"){
+  
+  require(data.table)
+  require(dplyr)
+  require(sfdSAR)
+  require(icesVMS)
+  
+  setDT(x)
+  ID <- c(oal_name, kw_name)
+  x[,(ID):= lapply(.SD, as.numeric), .SDcols = ID]
+  x[, Metier_level6 := get(met_name)]
+  
+  
+  #Updated metiers
+  metier_lookup <- fread("https://raw.githubusercontent.com/ices-eg/RCGs/master/Metiers/Reference_lists/RDB_ISSG_Metier_list.csv")
+  
+  if(any(x[, get(met_name)] %!in% metier_lookup$Metier_level6))
+    stop(paste("Non valid metiers in tacsatEflalo:", paste(x[x[, get(met_name)] %!in% metier_lookup$Metier_level6][, get(met_name)], collapse = ", ")))
+  
+  gear_widths <- get_benthis_parameters()
+  
+  aux_lookup <- data.table(merge(gear_widths, metier_lookup, by.x = "benthisMet", by.y = "Benthis_metiers", all.y = T))
+  aux_lookup <- aux_lookup[,.(Metier_level6, benthisMet, avKw, avLoa, avFspeed, subsurfaceProp, gearWidth, firstFactor, secondFactor, gearModel, 
+                              gearCoefficient, contactModel)]
+  
+  aux_lookup <<- unique(aux_lookup)
+  
+  
+  aux_lookup <- data.table(merge(gear_widths, metier_lookup, by.x = "benthisMet", by.y = "Benthis_metiers", all.y = T))
+  aux_lookup <- aux_lookup[,.(Metier_level6, benthisMet, avKw, avLoa, avFspeed, subsurfaceProp, gearWidth, firstFactor, secondFactor, gearModel, 
+                              gearCoefficient, contactModel)]
+  
+  aux_lookup[gearCoefficient == "avg_kw", gearCoefficient := kw_name]
+  aux_lookup[gearCoefficient == "avg_oal", gearCoefficient := oal_name]
+  
+  aux_lookup <- unique(aux_lookup)
+  
+  vms <- x |> 
+    left_join(aux_lookup, by = "Metier_level6")
+  
+  vms$surface <-
+    predict_surface_contact(vms$contactModel,
+                            vms$INTV,
+                            vms$GEARWIDTH,
+                            vms$SI_SP)
+  
+  vms[contactModel == "trawl_contact", surface := surface * 1000]
+  
+  # calculate subsurface contact
+  vms$subsurface <- vms$surface * as.numeric(vms$subsurfaceProp) * .01
+  
+  
+  return(vms$subsurface)
 }

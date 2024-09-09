@@ -7,7 +7,7 @@
 
 setwd("C:/Users/MD09/OneDrive - CEFAS/projects/datacalls/ices/2024")
 
-source("C:\\Users\\MD09\\Documents\\git\\ICES-VMS-and-Logbook-Data-Call_Cefas\\global-subset.R")
+source("global-subset.R")
 
 
 
@@ -40,6 +40,9 @@ for(year in yearsToSubmit){
   
         tacsatp = tacsat
   
+
+ 
+  
   ## END of CEFAS UPDATE 
   
   #'----------------------------------------------------------------------------
@@ -52,12 +55,17 @@ for(year in yearsToSubmit){
   
   # Use a loop to add each column
   for (col in cols) {
+    
+  #  col = 'LE_GEAR'
     # Match 'FT_REF' values in 'tacsatp' and 'eflalo' and use these to add the column from 'eflalo' to 'tacsatp'
     tacsatp[[col]] <- eflalo[[col]][match(as.numeric(tacsatp$FT_REF), as.numeric(eflalo$FT_REF))]
+  
+    
   }
   
   
   tacsatp <- as.data.frame(tacsatp)
+
   
   # Save not merged tacsat data
   # Subset 'tacsatp' where 'FT_REF' equals 0 (not merged)
@@ -76,29 +84,24 @@ for(year in yearsToSubmit){
   # Subset 'tacsatp' where 'FT_REF' does not equal 0 (merged)
   tacsatp <- subset(tacsatp, FT_REF != 0)
   
+
+  
+ 
+  
+
   #'----------------------------------------------------------------------------
   # 2.1.3 For multi gear/metier etc trips, divide the pings to the right gear/metier etc. ----
   #'----------------------------------------------------------------------------
-  tacsatp_bk <- tacsatp
+ 
+   tacsatp_bk <- tacsatp
   # tacsatp <- tacsatp_bk
   
   
   tacsatpa_LE_GEAR <- trip_assign(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T)
+  
+
+  
   tacsatp <- rbindlist(list(tacsatp[tacsatp$FT_REF %!in% tacsatpa_LE_GEAR$FT_REF,], tacsatpa_LE_GEAR), fill = T)
-
-  dim(tacsatpa_LE_GEAR)
-  dim(tacsatp)
-
-
-
-  tacsatp %>% filter(is.na(LE_GEAR)) %>% tally()
-
-  tacsatp %>%  filter( FT_REF == '610917780')
-
-  eflalo %>% filter ( FT_REF == 'c')
-
-  tacsatp$FT_REF <- as.numeric(tacsatp$FT_REF)
-  eflalo$FT_REF <- as.numeric(eflalo$FT_REF)
 
 
   tacsatpa_LE_MSZ <- trip_assign(tacsatp, eflalo, col = "LE_MSZ", trust_logbook = T)
@@ -107,32 +110,36 @@ for(year in yearsToSubmit){
   tacsatpa_LE_RECT <- trip_assign(tacsatp, eflalo, col = "LE_RECT", trust_logbook = T)
   tacsatp <- rbindlist(list(tacsatp[tacsatp$FT_REF %!in% tacsatpa_LE_RECT$FT_REF,], tacsatpa_LE_RECT), fill = T)
 
+  ## Get teh statistics of VMS position derived ICES RECT vs reported RECTANGLE in LOGBOOKS
+  
+  tacsatprects  = tacsatp
+  
+  tacsatprects$LE_RECT_VMS =  ICESrectangle(dF = tacsatp |>  as.data.frame())
+  
+  tacsatprects |>  filter ( LE_RECT == LE_RECT_VMS) |>  dim ( )
+  
+  #VMS RECT == LOGBOOK RECT : 1046574  
+  
+  tacsatprects |>  filter ( LE_RECT != LE_RECT_VMS) |>  dim ( )
+  #VMS RECT != LOGBOOK RECT : 645448       
+  645448       / dim(tacsatp)[1]
+  #################################################
+  
+  
   tacsatpa_LE_MET <- trip_assign(tacsatp, eflalo, col = "LE_MET", trust_logbook = T)
   tacsatp <- rbindlist(list(tacsatp[tacsatp$FT_REF %!in% tacsatpa_LE_MET$FT_REF,], tacsatpa_LE_MET), fill = T)
 
-
-  tacsatp %>% filter (is.na( LE_GEAR ) )   %>% left_join(eflalo %>% rename(eLE_GEAR = LE_GEAR), by = "FT_REF" ) %>%
-    mutate (   LE_GEAR  = eLE_GEAR )
+  dim(tacsatp)
 
 
-  [tacsatp$FT_REF %!in% tacsatpa_LE_GEAR$FT_REF, LE_GEAR := ]
-
-
-  tacsatp$LE_GEAR     = eflalo$LE_GEAR    [ match(tacsatp$FT_REF, eflalo$FT_REF)]
-  tacsatp$LE_MSZ      = eflalo$LE_MSZ     [ match(tacsatp$FT_REF, eflalo$FT_REF)]
-  tacsatp$LE_RECT     = eflalo$LE_RECT    [ match(tacsatp$FT_REF, eflalo$FT_REF)]
-  tacsatp$LE_MET      = eflalo$LE_MET     [ match(tacsatp$FT_REF, eflalo$FT_REF)]
-
-  if("LE_WIDTH" %in% names(eflalo)){
-    tacsatpa_LE_WIDTH <- trip_assign(tacsatp, eflalo, col = "LE_WIDTH", trust_logbook = T)
-    tacsatp <- rbindlist(list(tacsatp[tacsatp$FT_REF %!in% tacsatpa_LE_WIDTH$FT_REF,], tacsatpa_LE_WIDTH), fill = T)
-  }
+  ###  CEFAS DO NOT HAVE WIDTH OF GEAR INFORMATION
+# 
+#   if("LE_WIDTH" %in% names(eflalo)){
+#     tacsatpa_LE_WIDTH <- trip_assign(tacsatp, eflalo, col = "LE_WIDTH", trust_logbook = T)
+#     tacsatp <- rbindlist(list(tacsatp[tacsatp$FT_REF %!in% tacsatpa_LE_WIDTH$FT_REF,], tacsatpa_LE_WIDTH), fill = T)
+#   }
   
-  #Set catch date to be equal to SI_DATE 
-  ## THIS IS ONLY A REQUIREMENT FOR RUN SPLITAMONGPINGS2 
-  tacsatp$LE_CDAT <- tacsatp$SI_DATE
-  
-  tacsatp <- as.data.frame(tacsatp)
+
   
   # Save 'tacsatp' to a file named "tacsatMerged<year>.RData" in the 'outPath' directory
   save(
@@ -142,8 +149,13 @@ for(year in yearsToSubmit){
   
   
   
+  ### Identify VMS records as fishing  #####
   
+   join_q = join_by(LE_L5MET, between ( SI_SP, min, max) )
   
+  tacsatp = tacsatp |>  left_join( speedarr_met5  , by = join_q )
+  
+  tacsatp = tacsatp |>  mutate ( SI_STATE = ifelse ( is.na (min) & is.na (max) , 's', 'f')) |>  select( -colnames (speedarr_met5 ))
   
   
     
@@ -162,6 +174,7 @@ for(year in yearsToSubmit){
   # -------------------------------------------------
   
   # Get the indices of columns in eflalo that contain "LE_KG_" or "LE_EURO_"
+    
   idx_kg <- grep("LE_KG_", colnames(eflalo)[colnames(eflalo) %!in% c("LE_KG_TOT")])
   idx_euro <- grep("LE_EURO_", colnames(eflalo)[colnames(eflalo) %!in% c("LE_EURO_TOT")])
   
@@ -186,8 +199,6 @@ for(year in yearsToSubmit){
   message(sprintf("%.2f%% of the eflalo data not in tacsat\n", (nrow(eflaloNM) / (nrow(eflaloNM) ))))
   
   
-  tacsatp$SI_STATE <- ifelse(tacsatp$SI_SP >1 & tacsatp$SI_SP <=6, 'f', 's')
-  
   tacsatp %>% filter(SI_STATE == 'f') %>% tally()
     
   # Convert SI_STATE to binary (0/1) format
@@ -203,6 +214,11 @@ for(year in yearsToSubmit){
   typeof(eflalo$LE_CDAT)
   
   eflalo$LE_CDAT <- as.character(eflalo$LE_CDAT)
+  
+  #Set catch date to be equal to SI_DATE 
+  ## THIS IS ONLY A REQUIREMENT FOR RUN SPLITAMONGPINGS2 
+  tacsatp$LE_CDAT <- tacsatp$SI_DATE
+  tacsatp <- as.data.frame(tacsatp)
   
   # Distribute landings among pings, first by day, metier and trip; then by metier and trip; then by trip
   tacsatEflalo <- splitAmongPings2(tacsatp, eflalo) # was originally splitAmongPings2(tacsatp, eflalo)
@@ -268,8 +284,10 @@ for(year in yearsToSubmit){
   tacsatEflalo$Month <- month(tacsatEflalo$SI_DATIM)
   
   # Calculate the kilowatt-hour and convert interval to hours
-  tacsatEflalo$kwHour <- tacsatEflalo$VE_KW * tacsatEflalo$INTV / 60
-  tacsatEflalo$INTV <- tacsatEflalo$INTV / 60
+  ### CEFAS INTV is already in hours so not need to transform 
+  
+  tacsatEflalo$kwHour <- tacsatEflalo$VE_KW * tacsatEflalo$INTV 
+  tacsatEflalo$INTV <- tacsatEflalo$INTV 
   
   # Add the calculated gear width to each fishing point
   tacsatEflalo$GEARWIDTH <- add_gearwidth(tacsatEflalo)
