@@ -148,14 +148,34 @@ for(year in yearsToSubmit){
   )
   
   
-  
+  #########################################
   ### Identify VMS records as fishing  #####
+  ##########################################
+  
+  
+  ## Load the Fishing Speed Arrays from the AD-HOC speed profile analysis
+  
+  load(file =   file.path(outPath, paste0("fishing_speed_met5_array_2024.RData")) )
+  
+  # start by correctly formatting the level 5 metier
+  
+  tacsatp$LE_L5MET <-  sapply(strsplit(tacsatp$LE_MET, "_"), function(x) paste(x[1:2], collapse = "_"))  
+  
   
    join_q = join_by(LE_L5MET, between ( SI_SP, min, max) )
   
-  tacsatp = tacsatp |>  left_join( speedarr_met5  , by = join_q )
+  tacsatp = tacsatp |>  left_join( fishing_speed_met5_array  , by = join_q )
   
   tacsatp = tacsatp |>  mutate ( SI_STATE = ifelse ( is.na (min) & is.na (max) , 's', 'f')) |>  select( -colnames (speedarr_met5 ))
+  
+  
+  
+  ##Get statistics on the number of fishing trips
+  tacsatp |>  group_by(SI_STATE )   |>  summarise ( n =  n())
+  
+  
+  
+  
   
   
     

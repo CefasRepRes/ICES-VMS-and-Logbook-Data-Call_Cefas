@@ -15,6 +15,11 @@ source("C:\\Users\\MD09\\Documents\\git\\ICES-VMS-and-Logbook-Data-Call_Cefas\\g
 
 year = 2023
 
+## this script is an ad_hoc analysis to be run under request to review given fishing speed values
+## YEAR_ANALYSIS of the ad_hoc analysis
+
+year_analysis = 2024
+
 load(file = paste0(outPath, paste0("/cleanEflalo", year,".RData")))
 load(file = paste0(outPath, paste0("/cleanTacsat", year,".RData")))
 load(file = paste0(outPath, paste0("/tacsatMerged", year,".RData")))
@@ -24,8 +29,6 @@ load(file = paste0(outPath, paste0("/tacsatMerged", year,".RData")))
 tacsatp = tacsatp  |>  mutate ( SI_YEAR = lubridate::year( SI_DATIM )  ) 
 
 
-
- 
 # Calculate time interval between points (NA :: CEFAS DOES IN GEOGFISH GDB )
  ## tacsatp <- intvTacsat(tacsatp, level = "trip", fill.na = TRUE)
 
@@ -42,7 +45,7 @@ tacsatp = tacsatp  |>  mutate ( SI_YEAR = lubridate::year( SI_DATIM )  )
 
 # Remove points with NA's in them in critical places
     
-  dim(tacsatp)
+dim(tacsatp)
     
     
 idx <-
@@ -206,21 +209,65 @@ tt =  ( sub_subTacsat |> filter(SI_YEAR == 2023) ) |>  as.data.frame()
  
  if ( dim (nonsub_subTacsat)[1]  > 0  )  nonsubTacsat =  rbind(  nonsub_subTacsat , nonsubTacsat ) 
  
- subTacsat =     sub_subTacsat  
+ subTacsat = sub_subTacsat  
  subTacsat$SI_STATE <- acTa
  
  
   
 
-# Check results, and if results are not satisfactory, run analyses again but now with fixed peaks # 
+#' Obtain the range speeds result by gear type. 
+#' This will obtain the model results ranges in a data frame and can be used to identify fishing VMS records 
+#' in the rest of the TACSAT dataset
 
-summary_table <- subTacsat %>%
+fishing_speed_matrix_autodetect <- subTacsat %>%
   filter(SI_STATE == "f") %>%
   group_by(LE_L5MET) %>%
   dplyr::summarise(
     min  = min(SI_SP),
     max  = max(SI_SP)
-  )
+)
+
+
+
+#### Apply the rules to round up/down the speed tresholds.
+#' The rational behind the round up the maximum threshodl and  down the minimun is the 
+#' limited number of VMS positions avialble due to the 2 hours  low-rate   positions reported by vessels
+#' There are many fishing operations that last less than 2 hours , therefore may are missed due to the low-frequency transmition
+#' It is preferable to retain VMS positions that are slightly above the ranges obtained with the model to get better definition
+#' of the fishing grounds and a better estimate of the hours of fishing in these grounds.  
+
+fishing_speed_matrix_autodetect_round = fishing_speed_matrix |>  mutate ( max = case_when( max <=4  ~ 4.5, 
+                                            between ( max, 4, 4.5 ) ~ 5   , 
+                                            between ( max, 4.5, 5 ) ~ 5.5   , 
+                                            between ( max, 5, 5.5 ) ~ 6 , 
+                                            between ( max, 5.5, 6 ) ~ 6.5, 
+                                            between ( max, 6, 6.5 ) ~ 6.75,
+                                            max >=6.5 ~7 ,
+                                            .default = max  )  )  |>
+  mutate ( min = case_when( min <= 1  ~ 1, 
+                            between ( min, 1, 1.5 ) ~ 1.25   , 
+                            between ( min, 1.5, 4 ) ~ 1.5    ,
+                            .default = min  )  )
+
+
+print(fishing_speed_matrix_autodetect_round |> as.data.frame())
+
+message(paste("These are your maximum and minimum fishing speeds (in knots), as defined by the autodetection algorithm, for ", year, ". Check they look realistic!", sep  =""))
+
+
+# Write the fishing_speed_matrix_round  table to a text file and R File 
+
+save(fishing_speed_matrix_autodetect_round, file = file.path(outPath, "fishing_speeds_by_metier_and_year_autodetect.RData"))
+
+ 
+write.table(fishing_speed_matrix_round, file = file.path(outPath, "fishing_speeds_by_metier_and_year_autodetect.txt"), 
+            append = TRUE, sep = "\t", row.names = FALSE, col.names = !file.exists(file.path(outPath, "fishing_speeds_by_metier_and_year_autodetect.txt")))
+write.table( fishing_speed_matrix_round |> as.data.frame() ,"clipboard",sep="\t",row.names= FALSE  )    
+
+ 
+
+
+
 
 summary_table <- subTacsat %>%
   filter(SI_STATE == "h") %>%
@@ -229,18 +276,6 @@ summary_table <- subTacsat %>%
     min_SI_SP = min(SI_SP),
     max_SI_SP = max(SI_SP)
   )
-
-print(summary_table |> as.data.frame())
-write.table( summary_table |> as.data.frame() ,"clipboard",sep="\t",row.names= FALSE  )    
-message(paste("These are your maximum and minimum fishing speeds (in knots), as defined by the autodetection algorithm, for ", year, ". Check they look realistic!", sep  =""))
-
- 
-
-# Write the summary table to a text file
-cat("\n\nYear:", year, "\n", file = file.path(outPath, "fishing_speeds_by_metier_and_year.txt"), append = TRUE)
-write.table(summary_table, file = file.path(outPath, "fishing_speeds_by_metier_and_year.txt"), 
-            append = TRUE, sep = "\t", row.names = FALSE, col.names = !file.exists(file.path(outPath, "fishing_speeds_by_metier_and_year.txt")))
-cat("\n", file = file.path(outPath, "fishing_speeds_by_metier_and_year.txt"), append = TRUE)
 
 
 # subTacsat <-
@@ -333,23 +368,15 @@ nonsubTacsat |>  filter ( SI_STATE == 's' )
 
  
 
-summary_table |>  mutate ( max = case_when( max <=4  ~ 4.5, 
-                                            between ( max, 4, 4.5 ) ~ 5   , 
-                                            between ( max, 4.5, 5 ) ~ 5.5   , 
-                                            between ( max, 5, 5.5 ) ~ 6 , 
-                                            between ( max, 5.5, 6 ) ~ 6.5, 
-                                            between ( max, 6, 6.5 ) ~ 6.75,
-                                            max >=6.5 ~7 ,
-                                            .default = max  )  )  |>
-                  mutate ( min = case_when( min <= 1  ~ 1, 
-                                            between ( min, 1, 1.5 ) ~ 1.25   , 
-                                            between ( min, 1.5, 4 ) ~ 1.5    ,
-                                            .default = min  )  )
-
-speedarr_met5 = bind_rows ( summary_table , speedarr_nonsubtacsat     )  |> as.data.frame()
+fishing_speed_met5_array = bind_rows ( fishing_speed_matrix_autodetect_round , speedarr_nonsubtacsat )  |> as.data.frame()
 
 
-write.table( speedarr_met5 |> as.data.frame() ,"clipboard",sep="\t",row.names= FALSE  )    
+
+save(fishing_speed_met5_array, file = file.path(outPath, paste0("fishing_speed_met5_array_", year_analysis, ".RData")))
+
+write.table( fishing_speed_met5_array |> as.data.frame() ,"clipboard",sep="\t",row.names= FALSE  )    
+write.table(fishing_speed_met5_array, file = file.path(outPath, paste0("fishing_speed_met5_array_", year_analysis, ".RData")), 
+            append = TRUE, sep = "\t", row.names = FALSE )
 
 
 # This next step is retained from previous code. The new function to assign
