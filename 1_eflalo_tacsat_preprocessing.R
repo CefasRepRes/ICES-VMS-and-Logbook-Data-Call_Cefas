@@ -100,13 +100,15 @@ for(year in yearsToSubmit){
   remrecsEflalo <-
     matrix(
       NA,
-      nrow = 8, ncol = 2,
+      nrow = 8, ncol = 4,
       dimnames =
         list(
           c("total", "duplicated", "impossible time", "before 1st Jan", "departArrival", "overlappingTrips", "MetierL4_LE_GEAR", "MetierL6_LE_MET") ,
-          c("rows", "percentage"))
+          c("rows", "percentage_rows", "tot_kg", "percentage_tot_kg"))
     )
-  remrecsEflalo["total", ] <- c(nrow(eflalo), "100%")
+  
+  remrecsEflalo["total",c("rows", "percentage_rows") ] <- c(nrow(eflalo), "100%")
+  remrecsEflalo["total",c("tot_kg", "percentage_tot_kg") ] <- c(sum(eflalo$LE_KG_TOT), "100%")
   
   
   # 1.3.2 Warn for outlying catch records --------------------------------------
