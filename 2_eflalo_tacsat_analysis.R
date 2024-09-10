@@ -28,7 +28,7 @@ for(year in yearsToSubmit){
   tacsat$geometry <- NULL
   
   #'----------------------------------------------------------------------------
-  # 2.1.1 Merge TACSAT and EFLALO                                             ----
+  # 2.1.1 Merge TACSAT and EFLALO    - ASSSIGN EFLALO details to TACSAT/VMS records     ----
   #'----------------------------------------------------------------------------
  
          #  tacsatp <- mergeEflalo2Tacsat(eflalo,tacsat)
@@ -150,9 +150,9 @@ for(year in yearsToSubmit){
   )
   
   
-  #########################################
-  ### Identify VMS records as fishing  #####
-  ##########################################
+  #####################################################################
+  ### Identify Fishing Activity  - TACSAT/VMS records as fishing  #####
+  #####################################################################
   
   load(file = file.path(outPath, paste0("tacsatMerged", year, ".RData")  ) ) 
   
@@ -174,7 +174,8 @@ for(year in yearsToSubmit){
   
   
   
-  ##Get statistics on the number of fishing trips
+  ##Get statistics on the number of VMS records fishing /no fishing
+  
   tacsatp |>  group_by(SI_STATE )   |>  summarise ( n =  n())
   
   
@@ -186,13 +187,7 @@ for(year in yearsToSubmit){
   # 2.2 Dispatch landings of merged eflalo at the ping scale
   # ----------------------------------------------------------------------------
     
-  #'----------------------------------------------------------------------------
-  # 2.2.1 continued, filter out invalid metier level 6 codes                           
-  #'----------------------------------------------------------------------------
-    kept <- nrow(tacsatp)
-    removed <- nrow(tacsatp %>% filter(LE_MET %!in% valid_metiers))
-    tacsatp <- tacsatp %>% filter(LE_MET %in% valid_metiers)
-    cat(sprintf("%.2f%% of of the tacsatp removed due to invalid metier l6 \n", (removed / (removed + kept) * 100)))
+ 
   
   # 2.2.2 Dispatch landings of merged eflalo at the ping scale
   # -------------------------------------------------
@@ -234,12 +229,11 @@ for(year in yearsToSubmit){
   # tacsatEflalo <- tacsatp[tacsatp$SI_STATE == 1,]
   
   tacsatp <- tacsatp[tacsatp$SI_STATE == 1,]
-  
   tacsatp <- tacsatp[!is.na(tacsatp$INTV),]
   
  
   
-      # eflalo$LE_CDAT <- as.character(eflalo$LE_CDAT)
+     
   
   #Set catch date to be equal to SI_DATE 
   ## THIS IS ONLY A REQUIREMENT FOR RUN SPLITAMONGPINGS2 
@@ -257,7 +251,7 @@ for(year in yearsToSubmit){
   tot_kg_eflalo = eflalo |> summarise(total = sum ( LE_KG_TOT)  ) |> pull() 
   tot_kg_eflaloM = eflaloM |> summarise(total = sum ( LE_KG_TOT)  ) |> pull() 
   tot_kg_eflaloTacsat = tacsatEflalo |> summarise(total = sum ( LE_KG_TOT)) |> pull() 
-    summary_landings_tacsatEflalo = data.frame ( ref = c(  "total_landings_kg_eflalo ","total_landings_kg_eflaloM", "total_landings_kg_tacsat_eflalo"  ) , 
+  summary_landings_tacsatEflalo = data.frame ( ref = c(  "total_landings_kg_eflalo ","total_landings_kg_eflaloM", "total_landings_kg_tacsat_eflalo"  ) , 
                total = c(  tot_kg_eflalo,  tot_kg_eflaloM   ,  tot_kg_eflaloTacsat )   ) |> 
     add_row (  ref = "eflaloM - tacsatEflalo total kg", total =  tot_kg_eflaloM - tot_kg_eflaloTacsat  )
     
@@ -293,10 +287,7 @@ for(year in yearsToSubmit){
   
   
   print("Dispatching landings completed")
-  
-  
-  
-  print("")
+
   
 }
 
@@ -354,7 +345,7 @@ for(year in yearsToSubmit){
     
   save(
     tacsatEflalo,
-    file = file.path(outPath, paste0("tacsatEflalo", year, ".RData"))
+    file = file.path(outPath, paste0("tacsatEflalo_hab_depth", year, ".RData"))
   )
   
 
