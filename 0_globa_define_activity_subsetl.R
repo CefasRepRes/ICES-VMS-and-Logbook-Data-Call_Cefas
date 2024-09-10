@@ -54,6 +54,7 @@ ac.tac.anal <- function(tacsat, units = "year", storeScheme = storeScheme, analy
           sTacsat <- subset(tacsat, format(tacsat$SI_DATIM, "%Y") == yr & month(tacsat$SI_DATIM) == mth)
       }
       for (iBy in na.omit(unique(sTacsat[, get (analyse.by)]))) {
+        
         dat <- subset(sTacsat, sTacsat[, get(analyse.by) ] == iBy)
         datmr <- dat
         datmr$SI_SP <- -1 * dat$SI_SP
@@ -61,7 +62,9 @@ ac.tac.anal <- function(tacsat, units = "year", storeScheme = storeScheme, analy
         xrange <- pmin(20, range(datmr$SI_SP), na.rm = TRUE)
         datmr$SI_SP[which(abs(datmr$SI_SP) > 20)] <- NA
         hist(datmr$SI_SP, breaks = seq(-20, 20, 0.5),
-             main = paste(iBy, ifelse(yr > 0, yr, ""), ifelse(mth > 0, mth, ""), ifelse(wk > 0, wk, "")), xaxt = "n")
+             main = paste(iBy, ifelse(yr > 0, yr, ""), 
+                          ifelse(mth > 0, mth, ""),
+                          ifelse(wk > 0, wk, "")), xaxt = "n")
         axis(1, at = seq(-20, 20, 1))
         
         # Introduce a delay before calling the callNumberPeak() function
@@ -96,12 +99,20 @@ ac.tac.anal <- function(tacsat, units = "year", storeScheme = storeScheme, analy
 
 act.tac <- function (tacsat, units = "year", analyse.by = "LE_L5MET", storeScheme = NULL, 
                      plot = FALSE, level = "all"){
+  
+  
+  
+  tacsat =  sub_subTacsat |> filter(SI_YEAR == 2023)   
+  
+  
   require("mixtools")
   if (!"SI_DATIM" %in% colnames(tacsat)) 
     tacsat$SI_DATIM <- as.POSIXct(paste(tacsat$SI_DATE, tacsat$SI_TIME, # id datim doesn't exist in eflalo, creates in
                                         sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
   if (!analyse.by %in% c("LE_L5MET", "VE_REF")) 
     stop("Analysing only by level 5 metier or vessel")                            ## would it be useful to examine speeds at L5 or L6 metier?
+
+  
   tacsat$ID <- 1:nrow(tacsat)
   tacsat$SI_STATE <- NA                                                   ## creates ID and blank column to receive state
   tacsatOrig <- tacsat  
@@ -208,6 +219,7 @@ act.tac <- function (tacsat, units = "year", analyse.by = "LE_L5MET", storeSchem
             ss <- storeScheme[which(storeScheme$years == 
                                       yr & storeScheme$months == mth & storeScheme$weeks == 
                                       wk & storeScheme$analyse.by == iGr), "means"]
+            
             print ( c( yr, '-', mth, '-', wk, '-', iGr))
             print( ss )
             

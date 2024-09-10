@@ -363,6 +363,8 @@ nonsubTacsat$SI_STATE[ is.na(nonsubTacsat$SI_STATE) ] <- "s"
 
 nonsubTacsat |>  filter ( SI_STATE == 's' ) 
 
+##remove the MIS_MIS since it exists in the autodetection- mobile  gears  
+speedarr_nonsubtacsat = speedarr_nonsubtacsat |>  filter(LE_L5MET  != 'MIS_MIS' )
 
 # Combine the two dataset together again =============== 
 
@@ -394,3 +396,44 @@ write.table(fishing_speed_met5_array, file = file.path(outPath, paste0("fishing_
 #     tacsatp$VE_REF[2:(nrow(tacsatp) - 1)] == tacsatp$VE_REF[3:(nrow(tacsatp))]
 #  ) + 1
 # tacsatp$SI_STATE[idx] <- "f"
+
+
+
+###########################################################################
+##
+##'   Quality Control of the Fishing Speed Arrays Analysis 2024 
+##'   Validation of the results with Observers Trips data
+##'
+##########################################################################
+
+##'
+##' The Observers data record the start and end of the hauls. This dates 
+##' can be used to delimited the start and end of a fishing trip in the VMS data 
+##' 
+##' 
+
+
+#### Load the observers data in GeoFISH
+path_observers_data = "C:/Users/RM12/OneDrive - CEFAS/Roi/projects/datacalls/ices/march_2024/ICES-VMS-and-Logbook-Data-Call_Cefas/fishing_speeds_profiles_analysis_2024/observers_data/"
+trip_metier   = read.csv(file.path(paste0(path_observers_data,"trip_metier_2019_23_ARS.csv") )  ) 
+sfs_haul_positions   = read.csv(file.path(paste0(path_observers_data,"SFS_Haul_positions 2023.csv") )  ) 
+sfs_haul_positions = sfs_haul_positions |> select (TripIdentifier, HaulNo,   shotdate , shottime, hauldate , haultime  ) 
+
+obs_haul_positions   = read.csv(file.path(paste0(path_observers_data,"OBS_Haul_positions 20192023.csv") )  ) 
+
+obs_haul_positions = obs_haul_positions |> select (tripid , haulno ,   shotdate , shottime, hauldate , haultime  ) 
+
+
+colnames ( obs_haul_positions ) = colnames(sfs_haul_positions)
+ 
+haul_positions = bind_rows(sfs_haul_positions, obs_haul_positions)
+
+trip_metier_haul = trip_metier |>  
+  inner_join( haul_positions  |> 
+                mutate ( shot_datim = lubridate::dmy_hms (paste ( shotdate, shottime, ' ') ) , haul_datim   = lubridate::dmy_hms (paste ( hauldate, haultime, ' ') )) ,
+              by = join_by(TRIP.CODE == TripIdentifier, HAUL.CODE == HaulNo )) |> 
+  arrange(shot_datim)
+
+
+trip_metier_haul |> mutate( y=  lubridate::year(shot_datim )) |>  distinct(y)
+ 

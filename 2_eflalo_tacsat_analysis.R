@@ -118,10 +118,12 @@ for(year in yearsToSubmit){
   
   tacsatprects |>  filter ( LE_RECT == LE_RECT_VMS) |>  dim ( )
   
-  #VMS RECT == LOGBOOK RECT : 1046574  
+  #VMS RECT == LOGBOOK RECT : 1046574             
   
   tacsatprects |>  filter ( LE_RECT != LE_RECT_VMS) |>  dim ( )
-  #VMS RECT != LOGBOOK RECT : 645448       
+  #VMS RECT != LOGBOOK RECT : 645448                
+  
+  
   645448       / dim(tacsatp)[1]
   #################################################
   
@@ -152,6 +154,7 @@ for(year in yearsToSubmit){
   ### Identify VMS records as fishing  #####
   ##########################################
   
+  load(file = file.path(outPath, paste0("tacsatMerged", year, ".RData")  ) ) 
   
   ## Load the Fishing Speed Arrays from the AD-HOC speed profile analysis
   
@@ -162,7 +165,8 @@ for(year in yearsToSubmit){
   tacsatp$LE_L5MET <-  sapply(strsplit(tacsatp$LE_MET, "_"), function(x) paste(x[1:2], collapse = "_"))  
   
   
-   join_q = join_by(LE_L5MET, between ( SI_SP, min, max) )
+   
+  join_q = join_by(LE_L5MET, between ( SI_SP, min, max) )
   
   tacsatp = tacsatp |>  left_join( fishing_speed_met5_array  , by = join_q )
   
@@ -180,7 +184,7 @@ for(year in yearsToSubmit){
   
     
   # 2.2 Dispatch landings of merged eflalo at the ping scale
-  # -------------------------------------------------
+  # ----------------------------------------------------------------------------
     
   #'----------------------------------------------------------------------------
   # 2.2.1 continued, filter out invalid metier level 6 codes                           
@@ -193,47 +197,49 @@ for(year in yearsToSubmit){
   # 2.2.2 Dispatch landings of merged eflalo at the ping scale
   # -------------------------------------------------
   
-  # Get the indices of columns in eflalo that contain "LE_KG_" or "LE_EURO_"
     
-  idx_kg <- grep("LE_KG_", colnames(eflalo)[colnames(eflalo) %!in% c("LE_KG_TOT")])
-  idx_euro <- grep("LE_EURO_", colnames(eflalo)[colnames(eflalo) %!in% c("LE_EURO_TOT")])
-  
-  # Calculate the total KG and EURO for each row
-  if("LE_KG_TOT" %!in% names(eflalo)){
-    eflalo$LE_KG_TOT <- rowSums(eflalo[, idx_kg], na.rm = TRUE)
-  }
-  if("LE_EURO_TOT" %!in% names(eflalo)){
-    eflalo$LE_EURO_TOT <- rowSums(eflalo[, idx_euro], na.rm = TRUE)
-  }
-  
-  eflalo_bk <- eflalo
-  eflalo <- eflalo_bk
-  
-  # Remove the columns used for the total calculation
-  eflalo <- eflalo[, -c(idx_kg, idx_euro)]
+    
+  ## CEFAS get teh total kilograms and value landed when data is imported from GEOFISH
+  # Get the indices of columns in eflalo that contain "LE_KG_" or "LE_EURO_"
+  #   
+  # idx_kg <- grep("LE_KG_", colnames(eflalo)[colnames(eflalo) %!in% c("LE_KG_TOT")])
+  # idx_euro <- grep("LE_EURO_", colnames(eflalo)[colnames(eflalo) %!in% c("LE_EURO_TOT")])
+  # 
+  # # Calculate the total KG and EURO for each row
+  # if("LE_KG_TOT" %!in% names(eflalo)){
+  #   eflalo$LE_KG_TOT <- rowSums(eflalo[, idx_kg], na.rm = TRUE)
+  # }
+  # if("LE_EURO_TOT" %!in% names(eflalo)){
+  #   eflalo$LE_EURO_TOT <- rowSums(eflalo[, idx_euro], na.rm = TRUE)
+  # }
+  # 
+  # eflalo_bk <- eflalo
+  # eflalo <- eflalo_bk
+  # 
+  # # Remove the columns used for the total calculation
+  # eflalo <- eflalo[, -c(idx_kg, idx_euro)]
   
   # Split eflalo into two data frames based on the presence of FT_REF in tacsatp
+    
   eflaloNM <- subset(eflalo, !FT_REF %in% unique(tacsatp$FT_REF))
   eflaloM <- subset(eflalo, FT_REF %in% unique(tacsatp$FT_REF))
 
   message(sprintf("%.2f%% of the eflalo data not in tacsat\n", (nrow(eflaloNM) / (nrow(eflaloNM) ))))
   
   
-  tacsatp %>% filter(SI_STATE == 'f') %>% tally()
-    
   # Convert SI_STATE to binary (0/1) format
   tacsatp$SI_STATE <- ifelse(tacsatp$SI_STATE == "f", 1, 0)
   
   # Filter rows where SI_STATE is 1
   # tacsatEflalo <- tacsatp[tacsatp$SI_STATE == 1,]
+  
   tacsatp <- tacsatp[tacsatp$SI_STATE == 1,]
   
   tacsatp <- tacsatp[!is.na(tacsatp$INTV),]
   
-  typeof(tacsatp$SI_DATE)
-  typeof(eflalo$LE_CDAT)
+ 
   
-  eflalo$LE_CDAT <- as.character(eflalo$LE_CDAT)
+      # eflalo$LE_CDAT <- as.character(eflalo$LE_CDAT)
   
   #Set catch date to be equal to SI_DATE 
   ## THIS IS ONLY A REQUIREMENT FOR RUN SPLITAMONGPINGS2 
@@ -241,20 +247,44 @@ for(year in yearsToSubmit){
   tacsatp <- as.data.frame(tacsatp)
   
   # Distribute landings among pings, first by day, metier and trip; then by metier and trip; then by trip
-  tacsatEflalo <- splitAmongPings2(tacsatp, eflalo) # was originally splitAmongPings2(tacsatp, eflalo)
+  tacsatEflalo <- splitAmongPings2(tacsatp, eflaloM) # was originally splitAmongPings2(tacsatp, eflalo)
+  
+ 
+  
+  ## Get the summary of dispatched landing values to VMS records 
+  
+  
+  tot_kg_eflalo = eflalo |> summarise(total = sum ( LE_KG_TOT)  ) |> pull() 
+  tot_kg_eflaloM = eflaloM |> summarise(total = sum ( LE_KG_TOT)  ) |> pull() 
+  tot_kg_eflaloTacsat = tacsatEflalo |> summarise(total = sum ( LE_KG_TOT)) |> pull() 
+    summary_landings_tacsatEflalo = data.frame ( ref = c(  "total_landings_kg_eflalo ","total_landings_kg_eflaloM", "total_landings_kg_tacsat_eflalo"  ) , 
+               total = c(  tot_kg_eflalo,  tot_kg_eflaloM   ,  tot_kg_eflaloTacsat )   ) |> 
+    add_row (  ref = "eflaloM - tacsatEflalo total kg", total =  tot_kg_eflaloM - tot_kg_eflaloTacsat  )
+    
+    save(
+      summary_landings_tacsatEflalo,
+      file = file.path(outPath, paste0("summary_landings_tacsatEflalo", year, ".RData"))
+    )
+    
+    
+    save(
+      tacsatEflalo,
+      file = file.path(outPath, paste0("tacsatEflalo", year, ".RData"))
+    )
+    
+    
+    ### IDENTIFY THE EFLALO RECORD WITH NOT RELATED VMS /TACSAT DATA 
+  
   
   eflalo$tripInTacsat <- ifelse(eflalo$FT_REF %in% tacsatEflalo$FT_REF, "Y", "N")
 
-  
-  save(
-    tacsatEflalo,
-    file = file.path(outPath, paste0("tacsatEflalo", year, ".RData"))
-  )
 
   save(
     eflalo,
     file = file.path(outPath, paste0("/cleanEflalo2", year, ".RData"))
   )
+  
+  ## SAVE FINAL VERSION OF TACSATP 
   
   save(
     tacsatp,

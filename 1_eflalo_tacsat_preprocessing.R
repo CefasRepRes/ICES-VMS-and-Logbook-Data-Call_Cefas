@@ -410,13 +410,6 @@ for(year in yearsToSubmit){
   print(remrecsEflalo)
 
 
-
-
-  
-  
-  
-  
-  
   #'----------------------------------------------------------------------------
   # 3  Clean the TACSAT data                                               ----
   #'----------------------------------------------------------------------------
@@ -620,9 +613,6 @@ for(year in yearsToSubmit){
   message("Cleaning tacsat completed for year ", year)
   print(remrecsTacsat)
   
-  
-
-
 } 
  
 
