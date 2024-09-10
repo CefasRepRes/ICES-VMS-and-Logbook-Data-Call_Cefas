@@ -17,22 +17,18 @@ library(tcltk)
 
 #setwd("C:/Users/MD09/OneDrive - CEFAS/projects/datacalls/ices/2024")
 
-year <- 2023
-yearsToSubmit <- 2023
+# year <- 2023
+# yearsToSubmit <- 2023
 
 
 # Set paths
-path <- paste0(getwd(), "/") # Working directory
-datapath <- paste0('Y:\\FISHERIES M MoU\\Working_Area\\spatial_fisheries_data\\ices_datacalls\\ices_vms_lb_datacall_2024\\data') # Data  directory
+# path <- paste0(getwd(), "/") # Working directory
+path <- 'Z:\\FISHERIES M MoU\\Working_Area\\spatial_fisheries_data\\ices_datacalls\\ices_vms_lb_datacall_2024\\'
+# datapath <- paste0('Y:\\FISHERIES M MoU\\Working_Area\\spatial_fisheries_data\\ices_datacalls\\ices_vms_lb_datacall_2024\\data') # Data  directory
 
-
+data_path <- paste0(path, 'data') # Data  directory
 codePath  <- paste0(path, "Scripts/")   # Location to store R scripts
 dataPath  <- paste0(path, "Data/")      # Location to store tacsat (VMS) and eflalo (logbook) data
-
-dataPath <- paste0('Y:\\FISHERIES M MoU\\Working_Area\\spatial_fisheries_data\\ices_datacalls\\ices_vms_lb_datacall_2024\\data\\input_data') # Data  directory
-intoutPath  <- paste0('Y:\\FISHERIES M MoU\\Working_Area\\spatial_fisheries_data\\ices_datacalls\\ices_vms_lb_datacall_2024\\data\\output_data') # Data  directory
-outPath <- paste0('Y:\\FISHERIES M MoU\\Working_Area\\spatial_fisheries_data\\ices_datacalls\\ices_vms_lb_datacall_2024\\data\\results') # Data  directory
-
 outPath   <- paste0(path, "Results/")   # Location to store the results
 plotPath  <- paste0(path, "Plots/") 
 
@@ -53,13 +49,13 @@ if(!file.exists(paste0(dataPath, "hab_and_bathy_layers.zip"))){
   ## The first time you run this code you will be prompted to enter your ICES Sharepoint password. Type it in the pop-up window to proceed with the download
 
 
-# Extract the zip archive
- unzip(paste0(dataPath, "hab_and_bathy_layers.zip"), exdir = dataPath, overwrite = TRUE, junkpaths = TRUE)
+  # Extract the zip archive
+  unzip(paste0(dataPath, "hab_and_bathy_layers.zip"), exdir = dataPath, overwrite = TRUE, junkpaths = TRUE)
 }
 
-eusm <- readRDS(paste0(dataPath, "eusm.rds"))
+eusm <- readRDS(paste0(dataPath, "hab_and_bathy_layers\\eusm.rds"))
 eusm <- eusm %>% st_transform(4326)
-bathy <- readRDS(paste0(dataPath, "ICES_GEBCO.rds"))
+bathy <- readRDS(paste0(dataPath, "hab_and_bathy_layers\\ICES_GEBCO.rds"))
 bathy <- bathy %>% st_set_crs(4326)
 
 #'------------------------------------------------------------------------------

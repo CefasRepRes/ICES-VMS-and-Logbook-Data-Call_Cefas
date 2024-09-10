@@ -5,7 +5,7 @@ library(data.table)
 library(icesVocab)
 
 # source("C:\\Users\\MD09\\Documents\\git\\ICES-VMS-and-Logbook-Data-Call_Cefas\\0_global.R")
-source("global-subset.R")
+source("C:/Users/MD09/Documents/git/ICES-VMS-and-Logbook-Data-Call_Cefas/global-subset.R")
 
 #'------------------------------------------------------------------------------
 #
@@ -40,7 +40,8 @@ source("global-subset.R")
 
 #### MIKE: Try initially only with 2023 data 
 
-year = 2023
+yearsToSubmit = 2009
+year = 2009
 
 # Looping through the years to submit
 for(year in yearsToSubmit){
@@ -51,24 +52,24 @@ for(year in yearsToSubmit){
   # 1  load TACSAT and EFLALO data from file                               ----
   #'----------------------------------------------------------------------------
   
-  load(
-        file.path(
-          dataPath,
-          paste0("tacsat-eflalo-data-processed.RData" )
-        ));
+  # load(
+  #       file.path(
+  #         dataPath,
+  #         paste0("tacsat-eflalo-data-processed.RData" )
+  #       ));
   
-  # tacsat_name <-
-  #   load(
-  #     file.path(
-  #       dataPath,
-  #       paste0("tacsat_", year, ".RData")
-  #     )); #- data is saved as tacsat_2009, tacsat_2010 etc
-  # eflalo_name <-
-  #   load(
-  #     file.path(
-  #       dataPath,
-  #       paste0("eflalo_", year, ".RData")
-  #     )); #- data is saved as eflalo_2009, eflalo_2010 etc
+  tacsat_name <-
+    load(
+      file.path(
+        dataPath,
+        paste0("tacsat-", year, ".RData")
+      )); #- data is saved as tacsat_2009, tacsat_2010 etc
+  eflalo_name <-
+    load(
+      file.path(
+        dataPath,
+        paste0("eflalo-", year, ".RData")
+      )); #- data is saved as eflalo_2009, eflalo_2010 etc
  
   
   ## MIKE: Load the data form GeoFISH source. Do not LOAD as SF , only as plain text 
@@ -78,8 +79,8 @@ for(year in yearsToSubmit){
   
   ## MIKE: Load the data form GeoFISH source. Do not LOAD as SF, only as plain text 
   ## ONLY VESSELS >= 12 meters
-  # tacsat <- data.frame(get(tacsat_name)) # rename to tacsat
-  # eflalo <- data.frame(get(eflalo_name)) # rename to eflalo
+  tacsat <- data.frame(get(tacsat_name)) # rename to tacsat
+  eflalo <- data.frame(get(eflalo_name)) # rename to eflalo
   
   #- Make sure data is in right format
   # tacsat <- formatTacsat(tacsat)
@@ -107,8 +108,9 @@ for(year in yearsToSubmit){
           c("rows", "percentage_rows", "tot_kg", "percentage_tot_kg"))
     )
   
-  remrecsEflalo["total",c("rows", "percentage_rows") ] <- c(nrow(eflalo), "100%")
-  remrecsEflalo["total",c("tot_kg", "percentage_tot_kg") ] <- c(sum(eflalo$LE_KG_TOT), "100%")
+  remrecsEflalo["total", c("rows", "percentage_rows")] <- c(nrow(eflalo), "100%")
+  remrecsEflalo["total", c("tot_kg", "percentage_tot_kg")] <- c(sum(eflalo$LE_KG_TOT), "100%")
+  remrecsEflalo
   
   
   # 1.3.2 Warn for outlying catch records --------------------------------------
@@ -155,9 +157,13 @@ for(year in yearsToSubmit){
   
   num_records <- nrow(eflalo)
   percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
+  kg_eflalo <- sum(eflalo$LE_KG_TOT)
+  percent_kg_removed <- round(as.numeric(kg_eflalo - as.numeric(remrecsEflalo["total", 3])) / as.numeric(remrecsEflalo["total", 3]) * 100, 2)
+  
   
   # Update the remrecsEflalo data frame with these values
-  remrecsEflalo["duplicated", ] <- c(num_records, 100+ percent_removed)
+  remrecsEflalo["duplicated", ] <- c(num_records, 100+ percent_removed, kg_eflalo, 100+ percent_kg_removed)
+  remrecsEflalo
   
   # 1.3.4 Remove impossible time stamp records ---------------------------------
   
@@ -175,9 +181,14 @@ for(year in yearsToSubmit){
   # Calculate the number of remaining records and the percentage of records removed
   num_records <- nrow(eflalo)
   percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
+  kg_eflalo <- sum(eflalo$LE_KG_TOT)
+  percent_kg_removed <- round(as.numeric(kg_eflalo - as.numeric(remrecsEflalo["total", 3])) / as.numeric(remrecsEflalo["total", 3]) * 100, 2)
+  
+  
   
   # Update the remrecsEflalo data frame with these values
-  remrecsEflalo["impossible time", ] <- c(num_records, 100 + percent_removed)
+  remrecsEflalo["impossible time", ] <- c(num_records, 100 + percent_removed, kg_eflalo, 100+ percent_kg_removed)
+  remrecsEflalo
   
   # 1.3.5 Remove trip starting before 1st Jan ----------------------------------
   
@@ -189,10 +200,12 @@ for(year in yearsToSubmit){
   # Calculate the number of remaining records and the percentage of records removed
   num_records <- nrow(eflalo)
   percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
+  kg_eflalo <- sum(eflalo$LE_KG_TOT)
+  percent_kg_removed <- round(as.numeric(kg_eflalo - as.numeric(remrecsEflalo["total", 3])) / as.numeric(remrecsEflalo["total", 3]) * 100, 2)
   
   # Update the remrecsEflalo data frame with these values
-  remrecsEflalo["before 1st Jan", ] <- c(num_records, 100 + percent_removed)
-  
+  remrecsEflalo["before 1st Jan", ] <- c(num_records, 100 + percent_removed, kg_eflalo, 100+ percent_kg_removed)
+  remrecsEflalo
   
   # 1.3.6 Remove records with arrival date before departure date  --------------
   
@@ -213,10 +226,12 @@ for(year in yearsToSubmit){
     100 + round(
       (nrow(eflalo) - as.numeric(remrecsEflalo["total", 1])) / # Change in number of rows
         as.numeric(remrecsEflalo["total", 1]) * 100, # Relative to the original number of rows
-      2) # Rounded to 2 decimal places
+      2), # Rounded to 2 decimal places
+    sum(eflalo$LE_KG_TOT),
+    100+ round(as.numeric(kg_eflalo - as.numeric(remrecsEflalo["total", 3])) / as.numeric(remrecsEflalo["total", 3]) * 100, 2)
   )
   
-  
+  remrecsEflalo
   
   
   # 1.3.7 Remove trip with overlap with another trip ---------------------------
@@ -284,10 +299,12 @@ for(year in yearsToSubmit){
   # Calculate the number of remaining records and the percentage of records removed
   num_records <- nrow(eflalo)
   percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
+  kg_eflalo <- sum(eflalo$LE_KG_TOT)
+  percent_kg_removed <- round(as.numeric(kg_eflalo - as.numeric(remrecsEflalo["total", 3])) / as.numeric(remrecsEflalo["total", 3]) * 100, 2)
   
   # Update the remrecsEflalo data frame with these values
-  remrecsEflalo["overlappingTrips",] <- c(num_records, (100 + percent_removed))
-  
+  remrecsEflalo["overlappingTrips",] <- c(num_records, 100 + percent_removed, kg_eflalo, 100 + percent_kg_removed)
+  remrecsEflalo
   
    
   
@@ -352,13 +369,16 @@ for(year in yearsToSubmit){
   # Calculate the number of remaining records and the percentage of records removed
   num_records <- nrow(eflalo)
   percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
+  kg_eflalo <- sum(eflalo$LE_KG_TOT)
+  percent_kg_removed <- round(as.numeric(kg_eflalo - as.numeric(remrecsEflalo["total", 3])) / as.numeric(remrecsEflalo["total", 3]) * 100, 2)
   
   # Update the remrecsEflalo data frame with these values
-  remrecsEflalo["MetierL4_LE_GEAR", ] <- c(num_records, 100 + percent_removed)
+  remrecsEflalo["MetierL4_LE_GEAR", ] <- c(num_records, 100 + percent_removed, kg_eflalo, 100+ percent_kg_removed)
+  remrecsEflalo
   
   
   
-  ### 3.5.5 Check Metier L6 (Fishing Activity) categories are accepted -----------
+### 3.5.5 Check Metier L6 (Fishing Activity) categories are accepted -----------
   
   m6_ices         <-  getCodeList("Metier6_FishingActivity")
   
@@ -384,11 +404,12 @@ for(year in yearsToSubmit){
   # Calculate the number of remaining records and the percentage of records removed
   num_records <- nrow(eflalo)
   percent_removed <- round((num_records - as.numeric(remrecsEflalo["total", 1])) / as.numeric(remrecsEflalo["total", 1]) * 100, 2)
-  
+  kg_eflalo <- sum(eflalo$LE_KG_TOT)
+  percent_kg_removed <- round(as.numeric(kg_eflalo - as.numeric(remrecsEflalo["total", 3])) / as.numeric(remrecsEflalo["total", 3]) * 100, 2)
   
   # Add to remrecsEflalo
-  remrecsEflalo["MetierL6_LE_MET",] <- c(num_records, 100 + percent_removed)
-  
+  remrecsEflalo["MetierL6_LE_MET",] <- c(num_records, 100 + percent_removed, kg_eflalo, 100+ percent_kg_removed)
+  remrecsEflalo
   
   #'----------------------------------------------------------------------------
   # 2.4 SAVE THE EFLALO AND THE QC REMRECSEFLALO FILE --------------------------
@@ -404,7 +425,7 @@ for(year in yearsToSubmit){
   #   Save the cleaned eflalo file 
   save(
     eflalo,
-    file = file.path(outPath,paste0("cleanEflalo",year,".RData"))
+    file = file.path(outPath,paste0("cleanEflalo", year,".RData"))
   )
   message("Cleaning eflalo completed for year ", year)
   print(remrecsEflalo)
@@ -473,7 +494,7 @@ for(year in yearsToSubmit){
   
   # Update remrecsTacsat
   remrecsTacsat["duplicates",] <- c(nrow(tacsat), percentage_remaining)
-  
+  remrecsTacsat
   
   # 1.2.3 Remove points that have impossible coordinates -----------------------
   
@@ -500,7 +521,7 @@ for(year in yearsToSubmit){
   
   # Update remrecsTacsat
   remrecsTacsat["notPossible",] <- c(nrow(tacsat), percentage_remaining)
-  
+  remrecsTacsat
   
   
   
@@ -525,6 +546,7 @@ for(year in yearsToSubmit){
   
   # Update remrecsTacsat
   remrecsTacsat["pseudoDuplicates",] <- c(nrow(tacsat), percentage_remaining)
+  remrecsTacsat
   
   # Remove intv_mins column from tacsat
   tacsat$intv_mins  = NULL ##delete the temporary field created
@@ -550,7 +572,7 @@ for(year in yearsToSubmit){
   # Update remrecsTacsat
   
   remrecsTacsat["Speed_ISNULL_unreal",] <- c(nrow(tacsat), percentage_remaining)
-  
+  remrecsTacsat
   
 
   
@@ -573,7 +595,7 @@ for(year in yearsToSubmit){
   
   # Update remrecsTacsat
   remrecsTacsat["VMSwithEFLALO_records",] <- c(nrow(tacsat), percentage_remaining)
-  
+  remrecsTacsat
  
   
   
@@ -598,7 +620,7 @@ for(year in yearsToSubmit){
   #  Save the remrecsTacsat file
   save(
     remrecsTacsat,
-    file = file.path(outPath, paste0("remrecsTacsat", year, ".RData"))
+    file = file.path(paste0(outPath, "remrecsTacsat", year, ".RData"))
   )
   tacsat <- as.data.frame(tacsat)
   # tacsat <- tacsat %>% dplyr::select(-geometry)
