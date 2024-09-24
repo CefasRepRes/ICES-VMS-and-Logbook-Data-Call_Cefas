@@ -7,11 +7,13 @@
 
 setwd("C:/Users/MD09/OneDrive - CEFAS/projects/datacalls/ices/2024")
 
-source("global-subset.R")
+source("C:/Users/MD09/Documents/git/ICES-VMS-and-Logbook-Data-Call_Cefas/global-subset.R")
 
 
 
-year = 2023
+yearsToSubmit = 2009:2023
+year <- 2009
+
 
 # Looping through the years to submit
 for(year in yearsToSubmit){
@@ -124,7 +126,7 @@ for(year in yearsToSubmit){
   #VMS RECT != LOGBOOK RECT : 645448                
   
   
-  645448       / dim(tacsatp)[1]
+  # 645448       / dim(tacsatp)[1]
   #################################################
   
   
@@ -146,7 +148,7 @@ for(year in yearsToSubmit){
   # Save 'tacsatp' to a file named "tacsatMerged<year>.RData" in the 'outPath' directory
   save(
     tacsatp,
-    file = file.path(outPath, paste0("tacsatMerged", year, ".RData"))
+    file = file.path(paste0(outPath, "tacsatMerged", year, ".RData"))
   )
   
   
@@ -154,15 +156,17 @@ for(year in yearsToSubmit){
   ### Identify Fishing Activity  - TACSAT/VMS records as fishing  #####
   #####################################################################
   
-  load(file = file.path(outPath, paste0("tacsatMerged", year, ".RData")  ) ) 
+  # load(file = file.path(outPath, paste0("tacsatMerged", year, ".RData")  ) ) 
   
   ## Load the Fishing Speed Arrays from the AD-HOC speed profile analysis
   
-  load(file =   file.path(outPath, paste0("fishing_speed_met5_array_2024.RData")) )
+  load(file =   file.path(dataPath, paste0("fishing_speed_met5_array_2024.RData")) )
   
   # start by correctly formatting the level 5 metier
   
-  tacsatp$LE_L5MET <-  sapply(strsplit(tacsatp$LE_MET, "_"), function(x) paste(x[1:2], collapse = "_"))  
+  if (year == yearsToSubmit[1]) {
+    tacsatp$LE_L5MET <-  sapply(strsplit(tacsatp$LE_MET, "_"), function(x) paste(x[1:2], collapse = "_"))
+  }
   
   
    
@@ -170,7 +174,7 @@ for(year in yearsToSubmit){
   
   tacsatp = tacsatp |>  left_join( fishing_speed_met5_array  , by = join_q )
   
-  tacsatp = tacsatp |>  mutate ( SI_STATE = ifelse ( is.na (min) & is.na (max) , 's', 'f')) |>  select( -colnames (speedarr_met5 ))
+  tacsatp = tacsatp |>  mutate ( SI_STATE = ifelse ( is.na (min) & is.na (max) , 's', 'f')) |>  select( -colnames (fishing_speed_met5_array ))
   
   
   
@@ -257,13 +261,13 @@ for(year in yearsToSubmit){
     
     save(
       summary_landings_tacsatEflalo,
-      file = file.path(outPath, paste0("summary_landings_tacsatEflalo", year, ".RData"))
+      file = file.path(paste0(outPath, "summary_landings_tacsatEflalo", year, ".RData"))
     )
     
     
     save(
       tacsatEflalo,
-      file = file.path(outPath, paste0("tacsatEflalo", year, ".RData"))
+      file = file.path(paste0(outPath, "tacsatEflalo", year, ".RData"))
     )
     
     
@@ -275,18 +279,18 @@ for(year in yearsToSubmit){
 
   save(
     eflalo,
-    file = file.path(outPath, paste0("/cleanEflalo2", year, ".RData"))
+    file = file.path(paste0(outPath, "cleanEflalo2_", year, ".RData"))
   )
   
   ## SAVE FINAL VERSION OF TACSATP 
   
   save(
     tacsatp,
-    file = file.path(outPath, paste0("/tacsatp", year, ".RData"))
+    file = file.path(paste0(outPath, "tacsatp", year, ".RData"))
   )
   
   
-  print("Dispatching landings completed")
+  print(paste0("Dispatching landings completed for ", year))
 
   
 }
@@ -305,6 +309,7 @@ for(year in yearsToSubmit){
 for(year in yearsToSubmit){
   print(paste0("Start loop for year ",year))
   load(file = paste0(outPath,"tacsatEflalo",year,".RData"))
+  
   
   # 2.3.1 Assign c-square, year, month, quarter, area and create table 1
   # ------------------------------------------------------------------
@@ -342,10 +347,10 @@ for(year in yearsToSubmit){
   # Check if logical
   tacsatEflalo[,.(min = min(GEARWIDTH), max = max(GEARWIDTH)), by = .(LE_MET)]
   
-    
+  
   save(
     tacsatEflalo,
-    file = file.path(outPath, paste0("tacsatEflalo_hab_depth", year, ".RData"))
+    file = file.path(paste0(outPath, "tacsatEflalo_hab_depth_", year, ".RData"))
   )
   
 

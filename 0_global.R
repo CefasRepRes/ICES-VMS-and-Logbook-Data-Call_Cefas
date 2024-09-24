@@ -41,6 +41,8 @@ install.packages("vmstools_0.77.tar.gz", repos = NULL, type = "source")
 # Clean up by removing the downloaded file
 unlink("vmstools_0.77.tar.gz")
 
+devtools::install_github("ices-tools-dev/sfdSAR")
+
 
 # Install required packages using pacman
 if (!require("pacman")) install.packages("pacman")

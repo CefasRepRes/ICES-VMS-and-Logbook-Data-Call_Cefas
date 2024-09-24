@@ -5,18 +5,19 @@
 #
 #'------------------------------------------------------------------------------
 
-setwd("C:/Users/MD09/OneDrive - CEFAS/projects/datacalls/ices/2024")
+# setwd("C:/Users/MD09/OneDrive - CEFAS/projects/datacalls/ices/2024")
 
 source("C:\\Users\\MD09\\Documents\\git\\ICES-VMS-and-Logbook-Data-Call_Cefas\\global-subset.R")
 
-year = 2023
+yearsToSubmit = 2009:2023
+# year = 2009
 
 # Loop through years to submit
 for(year in yearsToSubmit){
   
   # load data
-  load(file = paste0(outPath,paste0("/cleanEflalo",year,".RData")))
-  load(file = paste0(outPath,paste0("/tacsatEflalo",year,".RData")))  
+  load(file = paste0(outPath,paste0("/cleanEflalo2_",year,".RData")))
+  load(file = paste0(outPath,paste0("/tacsatEflalo_hab_depth_",year,".RData")))  
   #'----------------------------------------------------------------------------
   # 3.1 Create table 2                                                    ----
   #'----------------------------------------------------------------------------
@@ -25,7 +26,7 @@ for(year in yearsToSubmit){
   # eflalo$Year <- year(eflalo$FT_LDATIM)
   # eflalo$Month <- month(eflalo$FT_LDATIM)
   
-  # Set interval to 1 day for later caculation of kwDays
+  # Set interval to 1 day for later calculation of kwDays
   eflalo$INTV <- 1
   
   # Create a record variable for aggregation of records per vessel
@@ -52,12 +53,14 @@ for(year in yearsToSubmit){
   # Check if FT_REF is in tacsatp
   eflalo$tripInTacsat <- ifelse(eflalo$FT_REF %in% tacsatEflalo$FT_REF, "Y", "N")
   
+  eflalo %>% filter(tripInTacsat == 'Y') %>% tally()
+  
   # Define the record type
   RecordType <- "LE"
   
   # Define the columns to be included in the table
   cols <- c(
-    "VE_REF", "VE_COU", "Year", "Month", "LE_RECT", "LE_GEAR", "LE_MET",
+    "VE_REF", "VE_COU", "YEAR", "MONTH", "LE_RECT", "LE_GEAR", "LE_MET",
     "VE_LEN", "tripInTacsat", "INTV", "kwDays", "LE_KG_TOT", "LE_EURO_TOT"
   )
   
@@ -69,34 +72,37 @@ for(year in yearsToSubmit){
   }
   
   
-  # Save table2 
-  save(
-    table2,
-    file = file.path(outPath, "table2.RData" )
-  )
-  
-  message(glue ("Table 2 for year {year} is completed") )
+  message(glue("Table 2 for year {year} is completed") )
   
   
   #'----------------------------------------------------------------------------
   # 3.2   Create table 1                                                  ----
   #'----------------------------------------------------------------------------
-    tacsatEflalo <- data.frame(tacsatEflalo)
+  tacsatEflalo <- data.frame(tacsatEflalo)
   
   # Define the record type
   RecordType <- "VE"
   
   # Define the columns to be included in the table
   cols <- c(
-    "VE_REF", "VE_COU", "Year", "Month", "Csquare", "MSFD_BBHT", "depth", "LE_GEAR",
+    "VE_REF", "VE_COU", "SI_YEAR", "MONTH", "Csquare", "MSFD_BBHT", "depth", "LE_GEAR",
     "LE_MET", "SI_SP", "INTV", "VE_LEN", "kwHour", "VE_KW", "LE_KG_TOT", "LE_EURO_TOT",
     "GEARWIDTH", "SA_M2")
   
-  cols <- c(
-    "VE_REF", "VE_COU", "YEAR", "MONTH", "Csquare", "MSFD_BBHT", "depth", "LE_GEAR",
-    "LE_MET", "SI_SP", "INTV", "VE_LEN", "kwHour", "VE_KW", "LE_KG_TOT", "LE_EURO_TOT")
+  # cols <- c(
+  #   "VE_REF", "VE_COU", "YEAR", "MONTH", "Csquare", "MSFD_BBHT", "depth", "LE_GEAR",
+  #   "LE_MET", "SI_SP", "INTV", "VE_LEN", "kwHour", "VE_KW", "LE_KG_TOT", "LE_EURO_TOT")
   
-  cols %in% colnames(eflalo)
+  cols %in% colnames(tacsatEflalo)
+  
+  head(tacsatEflalo)
+  
+  missing_cols <- setdiff(cols, colnames(tacsatEflalo))
+  if (length(missing_cols) > 0) {
+    print(paste("Missing columns:", paste(missing_cols, collapse = ", ")))
+  }
+  
+  tacsatEflalo$MONTH <- month(tacsatEflalo$SI_DATE)
   
   # Create or append to table1 based on the year
   if (year == yearsToSubmit[1]) {
@@ -104,24 +110,33 @@ for(year in yearsToSubmit){
   } else {
     table1 <- rbind(table1, cbind(RT = RecordType, tacsatEflalo[,cols]))
   }
-  
-  # Save
-    save(
-    table1,
-    file = file.path(outPath, "table1.RData" )
-  )
+
   
   message(glue("Table 1 for year {year} is completed") )
 }
 
+# Save table2 
+save(
+  table2,
+  file = paste0(outPath, "table2.RData" )
+)
+
+# Save
+save(
+  table1,
+  file = paste0(outPath, "table1.RData" )
+)
+
+
+
 
 # Check if TABLE 1 fishing hours > 0
 
-table( table1$INTV > 0  )
+table(table1$INTV > 0)
 
 # Check if TABLE 2 fishing days  > 0
 
-table( table2$INTV > 0  )
+table(table2$INTV > 0)
 
 # End of QC checks
 
@@ -156,7 +171,7 @@ table2 <- left_join(table2, VE_lut)
 vlen_ices <- getCodeList("VesselLengthClass") ### Get DATSU Vocabulary list for selected data set
 
 
-# Filter the vessel length categories required  by  ICES VMS& Logbook datacall 
+# Filter the vessel length categories required  by  ICES VMS & Logbook datacall 
 vlen_icesc =  vlen_ices%>%
   filter ( Key %in% c("VL0006", "VL0608", "VL0810", "VL1012", "VL1215" ,"VL1518", "VL1824" ,"VL2440" ,"VL40XX"))%>%
   dplyr::select(Key)%>%
@@ -189,7 +204,7 @@ table1Save <- table1 %>%
   # Separate LE_MET into met4 and met5, dropping extra pieces
   separate(col = LE_MET, c("MetierL4", "MetierL5"), sep = '_', extra = "drop", remove = FALSE) %>%
   # Group by several variables
-  group_by(RecordType = RT, CountryCode = VE_COU, Year, Month, Csquare, MetierL4, MetierL5, MetierL6 = LE_MET, VesselLengthRange = LENGTHCAT, Habitat = MSFD_BBHT, Depth = depth) %>%
+  group_by(RecordType = RT, CountryCode = VE_COU, SI_YEAR, MONTH, Csquare, MetierL4, MetierL5, MetierL6 = LE_MET, VesselLengthRange = LENGTHCAT, Habitat = MSFD_BBHT, Depth = depth) %>%
   # Summarise the grouped data
   summarise(
     No_Records = n(),
@@ -222,7 +237,7 @@ table2Save <- table2 %>%
   # Separate LE_MET into met4 and met5
   separate(col = LE_MET, c("MetierL4", "MetierL5"), sep = '_', remove = FALSE) %>%
   # Group by several variables
-  group_by(RecordType = RT, CountryCode = VE_COU, Year, Month, ICESrectangle = LE_RECT, MetierL4, MetierL5, MetierL6 = LE_MET, VesselLengthRange = LENGTHCAT, VMSEnabled = tripInTacsat) %>%
+  group_by(RecordType = RT, CountryCode = VE_COU, YEAR, MONTH, ICESrectangle = LE_RECT, MetierL4, MetierL5, MetierL6 = LE_MET, VesselLengthRange = LENGTHCAT, VMSEnabled = tripInTacsat) %>%
   # Summarise the grouped data
   summarise(
     FishingDays = sum(INTV, na.rm = TRUE),
@@ -241,6 +256,14 @@ table2Save <- table2 %>%
 # Save 
 saveRDS(table1Save, paste0(outPath, "table1Save.rds"))
 saveRDS(table2Save, paste0(outPath, "table2Save.rds"))
+
+table1 %>% colnames()
+table1 %>%  group_by(MSFD_BBHT, LE_GEAR) %>% summarise(intv = sum( INTV)) %>%  arrange(desc(intv)) %>%  as.data.frame()
+table1 %>%  group_by(depth, LE_GEAR) %>% summarise(intv = sum( INTV)) %>%  arrange(desc(intv)) %>%  as.data.frame()
+
+unique(table1$MSFD_BBHT)
+
+# st_write(table1save, dsn = c(schema = ))
 
 
 #'------------------------------------------------------------------------------
@@ -361,13 +384,30 @@ remrecsTable1["MetierL6",] <- c(nrow(table1Save), nrow(table1Save)/as.numeric(re
 
 cntrcode <- getCodeList("ISO_3166")
 
-table (table1Save$CountryCode %in%cntrcode$Key )   # TRUE records accepted in DATSU, FALSE aren't
+unique(table1Save$CountryCode)
+country_keys <- unique(cntrcode$Key)
+writeLines(country_keys, paste0(outPath, "country_keys.txt"))
+
+country_code_lookup <- data.frame(
+  geofish_code = c("GBE", "GBG", "GBI", "GBJ", "GBN", "GBS", "GBW"),
+  ices_code = c("GB-ENG", "GG", "IM", "JE", "GB-NIR", "GB-SCT", "GB-WLS"))
+
+
+table1Save <- table1Save %>%
+  left_join(country_code_lookup, by = c("CountryCode" = "geofish_code")) %>%
+  mutate(CountryCode = coalesce(ices_code, CountryCode)) %>%
+  dplyr::select(-ices_code)
+
+table (table1Save$CountryCode %in% cntrcode$Key)   # TRUE records accepted in DATSU, FALSE aren't
 
 # If you have not accepted country codes, consider replacing with recognized DATSU country codes 
 # table1Save$CountryCode <- sub("NLD", "NL", table1Save$CountryCode)
 
 # Get summary  of   DATSU valid/not valid records
 table1Save [ !table1Save$CountryCode %in% cntrcode$Key,]%>% group_by(CountryCode) %>% dplyr::select(CountryCode) %>% tally()
+
+
+##### BREAKS IT #####
 
 # Correct them if any not valid and filter only valid ones
 table1Save      <-  table1Save%>%filter(CountryCode %in% cntrcode$Key)
@@ -428,6 +468,7 @@ table2Save      <-  table2Save%>%filter(MetierL4 %in% m4_ices$Key)
 
 # Add to remrecsTable2
 remrecsTable2["MetierL4",] <- c(nrow(table2Save), nrow(table2Save)/as.numeric(remrecsTable2["Total","RowsRemaining"])*100)
+remrecsTable2
 
 ### 3.5.11 Check Metier L5 (Target Assemblage) categories are accepted ----------
 m5_ices         <-  getCodeList("TargetAssemblage")
@@ -442,7 +483,7 @@ table2Save      <-  table2Save%>%filter(MetierL5 %in% m5_ices$Key)
 
 # Add to remrecsTable2
 remrecsTable2["MetierL5",] <- c(nrow(table2Save), nrow(table2Save)/as.numeric(remrecsTable2["Total","RowsRemaining"])*100)
-
+remrecsTable2
 
 ### 3.5.12 Check Metier L6 (Fishing Activity) categories are accepted ----------
 
@@ -458,7 +499,7 @@ table2Save      <-  table2Save%>%filter(MetierL6 %in% m6_ices$Key)
 
 # Add to remrecsTable2
 remrecsTable2["MetierL6",] <- c(nrow(table2Save), nrow(table2Save)/as.numeric(remrecsTable2["Total","RowsRemaining"])*100)
-
+remrecsTable2
 
 ### 3.5.13 Check VMSEnabled categories are accepted ----------------------------
 #table2Save <- table2Save %>%
@@ -477,7 +518,7 @@ table2Save      <-  table2Save%>%filter(VMSEnabled %in% yn$Key)
 
 # Add to remrecsTable2
 remrecsTable2["VMSEnabled",] <- c(nrow(table2Save), nrow(table2Save)/as.numeric(remrecsTable2["Total","RowsRemaining"])*100)
-
+remrecsTable2
 
 ### 3.5.15 Check country codes -------------------------------------------------
 #table2Save <- table2Save %>%
@@ -485,6 +526,18 @@ remrecsTable2["VMSEnabled",] <- c(nrow(table2Save), nrow(table2Save)/as.numeric(
 
 cntrcode <- getCodeList("ISO_3166")
 table (table2Save$CountryCode %in%cntrcode$Key )   # TRUE records accepted in DATSU, FALSE aren't
+
+colnames(table2Save)
+unique(table2Save$CountryCode)
+
+table2Save <- table2Save %>%
+  left_join(country_code_lookup, by = c("CountryCode" = "geofish_code")) %>%
+  mutate(CountryCode = coalesce(ices_code, CountryCode)) %>%
+  dplyr::select(-ices_code)
+
+unique(table2Save$CountryCode)
+
+table (table2Save$CountryCode %in%cntrcode$Key )   # TRUE records accepted in DATSU, FALSE aren't, check again
 
 # If you have not accepted country codes, consider replacing with recognized DATSU country codes 
 # table2Save$CountryCode <- sub("NLD", "NL", table2Save$CountryCode)
@@ -585,8 +638,8 @@ table( table2$INTV > 0  )
 #'------------------------------------------------------------------------------
 
 # Headers and quotes have been removed to be compatible with required submission and ICES SQL DB format.
-write.table(table1Save, file.path(outPath, "table1Save.csv"), na = "",row.names=FALSE,col.names=TRUE,sep=",",quote=FALSE)
-write.table(table2Save, file.path(outPath, "table2Save.csv"), na = "",row.names=FALSE,col.names=TRUE,sep=",",quote=FALSE)
+write.table(table1Save, file.path(outPath, "table1Save.csv"), na = "", row.names=FALSE, col.names=TRUE, sep=",", quote=FALSE)
+write.table(table2Save, file.path(outPath, "table2Save.csv"), na = "", row.names=FALSE, col.names=TRUE, sep=",", quote=FALSE)
 
 #'------------------------------------------------------------------------------
 # 3.8 Data call submission using ICESVMS package (OPTIONAL)                 ----
