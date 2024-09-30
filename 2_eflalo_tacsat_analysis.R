@@ -15,6 +15,8 @@ year = 2023
 
 # Looping through the years to submit
 for(year in yearsToSubmit){
+  
+  
   print(paste0("Start loop for year ", year))
   
   #'----------------------------------------------------------------------------
@@ -99,8 +101,6 @@ for(year in yearsToSubmit){
   
   tacsatpa_LE_GEAR <- trip_assign(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T)
   
-
-  
   tacsatp <- rbindlist(list(tacsatp[tacsatp$FT_REF %!in% tacsatpa_LE_GEAR$FT_REF,], tacsatpa_LE_GEAR), fill = T)
 
 
@@ -109,22 +109,35 @@ for(year in yearsToSubmit){
 
   tacsatpa_LE_RECT <- trip_assign(tacsatp, eflalo, col = "LE_RECT", trust_logbook = T)
   tacsatp <- rbindlist(list(tacsatp[tacsatp$FT_REF %!in% tacsatpa_LE_RECT$FT_REF,], tacsatpa_LE_RECT), fill = T)
-
-  ## Get teh statistics of VMS position derived ICES RECT vs reported RECTANGLE in LOGBOOKS
+              
+              #-------------------------------------------------------------------------------------------------
+              ## QC 1:  Get the  statistics of VMS position derived ICES RECT vs reported RECTANGLE in LOGBOOKS
+              #-------------------------------------------------------------------------------------------------
   
-  tacsatprects  = tacsatp
+              tacsatprects  = tacsatp
+              
+              tacsatprects$LE_RECT_VMS =  ICESrectangle(dF = tacsatp |>  as.data.frame())
+              
+              tacsat_ICES_rect_coincidence = tacsatprects |>  filter ( LE_RECT == LE_RECT_VMS) |>  dim ( ) 
+              
+              #VMS RECT == LOGBOOK RECT : 1046574             
+              
+              tacsat_ICES_rect_not_coincidence = tacsatprects |>  filter ( LE_RECT != LE_RECT_VMS) |>  dim ( )
+              #VMS RECT != LOGBOOK RECT : 645448      
+              
+              tacsat_eflalo_ICES_R_report =  data.frame(ref = c ("VMS records with LB coincidence ICES R.", "VMS records with LB not coincidence ICES R."), 
+                         records = c( tacsat_ICES_rect_coincidence[1], tacsat_ICES_rect_not_coincidence[1])) |> 
+                add_row(ref = "propotion of coincidence / total" ,  records =  round (( tacsat_ICES_rect_coincidence[1] / ( tacsat_ICES_rect_not_coincidence[1] + tacsat_ICES_rect_coincidence[1])  ), 2)   * 100    )
+              
+              
+              save(
+                tacsat_eflalo_ICES_R_report,
+                file = file.path(outPath, paste0("qc1_tacsat_eflalo_ICES_R_report", year, ".RData"))
+              )
+              
+              #QC1 END -------------------------------------------------------------------------------------------------------------
   
-  tacsatprects$LE_RECT_VMS =  ICESrectangle(dF = tacsatp |>  as.data.frame())
   
-  tacsatprects |>  filter ( LE_RECT == LE_RECT_VMS) |>  dim ( )
-  
-  #VMS RECT == LOGBOOK RECT : 1046574             
-  
-  tacsatprects |>  filter ( LE_RECT != LE_RECT_VMS) |>  dim ( )
-  #VMS RECT != LOGBOOK RECT : 645448                
-  
-  
-  645448       / dim(tacsatp)[1]
   #################################################
   
   
@@ -165,21 +178,34 @@ for(year in yearsToSubmit){
   tacsatp$LE_L5MET <-  sapply(strsplit(tacsatp$LE_MET, "_"), function(x) paste(x[1:2], collapse = "_"))  
   
   
+  ## Join the TACSAT data with the speed array ranges to identify fishing VMS records ('f') and not fishing records ( steaming, 's')
+  
    
   join_q = join_by(LE_L5MET, between ( SI_SP, min, max) )
+  tacsatp = tacsatp |>  left_join( fishing_speed_met5_array  , by = join_q  )
   
-  tacsatp = tacsatp |>  left_join( fishing_speed_met5_array  , by = join_q )
-  
-  tacsatp = tacsatp |>  mutate ( SI_STATE = ifelse ( is.na (min) & is.na (max) , 's', 'f')) |>  select( -colnames (speedarr_met5 ))
-  
-  
-  
-  ##Get statistics on the number of VMS records fishing /no fishing
-  
-  tacsatp |>  group_by(SI_STATE )   |>  summarise ( n =  n())
+  tacsatp = tacsatp |>  mutate ( SI_STATE = ifelse ( is.na (min) & is.na (max) , 's', 'f')) #|>  select( -colnames (fishing_speed_met5_array ))
   
   
   
+  
+  
+  
+  
+          #-------------------------------------------------------------------------------------------------
+          ## QC 2:   Get statistics on the number of VMS records fishing /no fishing
+          #-------------------------------------------------------------------------------------------------
+          
+           tacsatp_fishing_steaming =  tacsatp |>  group_by(SI_STATE )   |>  summarise ( n =  n())
+  
+          
+          save(
+            tacsatp_fishing_steaming,
+            file = file.path(outPath, paste0("qc2_tacsatp_fishing_steaming_", year, ".RData"))
+          )
+          
+          #QC2 END -------------------------------------------------------------------------------------------------------------
+          
   
   
   
@@ -188,11 +214,6 @@ for(year in yearsToSubmit){
   # ----------------------------------------------------------------------------
     
  
-  
-  # 2.2.2 Dispatch landings of merged eflalo at the ping scale
-  # -------------------------------------------------
-  
-    
     
   ## CEFAS get teh total kilograms and value landed when data is imported from GEOFISH
   # Get the indices of columns in eflalo that contain "LE_KG_" or "LE_EURO_"
@@ -215,25 +236,82 @@ for(year in yearsToSubmit){
   # eflalo <- eflalo[, -c(idx_kg, idx_euro)]
   
   # Split eflalo into two data frames based on the presence of FT_REF in tacsatp
+          ## Still include all VMS records in TACSATA_clean . Not filtered by fishing. 
+          
+  tacsatp  = tacsatp |>  as.data.frame()
+ 
+  
+  eflaloNM <- subset(eflalo, !FT_REF %in% unique(tacsatp$FT_REF) ) 
+  eflaloM  <- subset(eflalo, FT_REF %in% unique(tacsatp$FT_REF) ) 
+  
+  sum( eflaloNM$LE_KG_TOT)  ### EFLALO RECORDS WITH NOT RELATED VMS RECORDS 
+  sum( eflaloM$LE_KG_TOT)    ### EFLALO RECORDS WITH   RELATED VMS RECORDS 
+  
     
-  eflaloNM <- subset(eflalo, !FT_REF %in% unique(tacsatp$FT_REF))
-  eflaloM <- subset(eflalo, FT_REF %in% unique(tacsatp$FT_REF))
+  eflaloNM_tacsatp_f =   subset(eflalo, !FT_REF %in% unique(tacsatp[tacsatp$SI_STATE == 'f',  'FT_REF'] ))
+  eflaloM_tacsatp_f  =   subset(eflalo, FT_REF %in% unique(tacsatp[tacsatp$SI_STATE == 'f',  'FT_REF'] ))
+  
+  sum( eflaloNM_tacsatp_f$LE_KG_TOT) ## EFLALO RECORDS WITH NOT RELATED VMS RECORDS AS FISHING
+  sum( eflaloM_tacsatp_f$LE_KG_TOT)  ## EFLALO RECORDS WITH RELATED VMS RECORDS AS FISHING
+  
+  ##get teh total landings by not merged fishign trip in EFLALO 
+  
+  tot_kg_ft_ref = eflaloNM_tacsatp_f |>  group_by(FT_REF, LE_GEAR) |> summarise( tot_kg = sum ( LE_KG_TOT, na.rm = T))
+  
+  summary_not_merged    = tacsatp |>  filter (  FT_REF %in% unique ( eflaloNM_tacsatp_f$FT_REF) )  |> 
+    group_by(FT_REF, SI_STATE, LE_L5MET) |>  summarise( number_records = n(), speed_avg = mean(SI_SP),   speed_min = min(SI_SP),   speed_max = max(SI_SP)) |> 
+    arrange ( desc( number_records )   ) |> 
+    left_join( tot_kg_ft_ref, by = c('FT_REF' = 'FT_REF' )  ) |> 
+    arrange(desc(tot_kg))
+  
+  
+  summary_not_merged |> 
+    group_by(LE_L5MET) |>
+    summarise ( min_speed = min (speed_min), 
+                max_speed = max( speed_max),
+                avg= mean(speed_avg), 
+                tot_kg = sum  ( tot_kg),
+                number_records = sum( number_records), 
+                number_trips = length( unique(FT_REF) ) )  |>
+    mutate (  avg_kg_trip =   round( (tot_kg/number_trips), 2) , 
+                avg_records_trip =   round( (number_records/number_trips), 2   )          ) |> 
+    left_join(fishing_speed_met5_array, by  = 'LE_L5MET') |>  
+    arrange ( desc(tot_kg)) |> 
+    as.data.frame()
+  
+  tacsatp |> filter(    FT_REF %in% unique ( eflaloNM_tacsatp_f$FT_REF)  &  LE_L5MET == 'OTM_SPF')  |>
+   group_by(SI_SP)  |> tally() |>  arrange(SI_SP) |> as.data.frame()
+  
+  fishing_speed_met5_array |> filter ( grepl('OTM', LE_L5MET))
+  
+  ## Correct speed matrix 
+  
+ # FPO_CRU = c ( 0.1 , 3.5)
+ # PTM_SPF  = c( 1.5, 7)
+ #  PTM_SPF  = c( 1.5, 7)
+ ## DRB_MOL = half of teh data in 0 knots .not significant in the edges of teh speed limits 
+  
+  ggplot(summary_not_merged, aes(number_records, tot_kg  ))   + geom_line() + facet_wrap(~ LE_GEAR, scales = "free")
+  
 
   message(sprintf("%.2f%% of the eflalo data not in tacsat\n", (nrow(eflaloNM) / (nrow(eflaloNM) ))))
   
   
-  # Convert SI_STATE to binary (0/1) format
-  tacsatp$SI_STATE <- ifelse(tacsatp$SI_STATE == "f", 1, 0)
-  
-  # Filter rows where SI_STATE is 1
-  # tacsatEflalo <- tacsatp[tacsatp$SI_STATE == 1,]
-  
-  tacsatp <- tacsatp[tacsatp$SI_STATE == 1,]
-  tacsatp <- tacsatp[!is.na(tacsatp$INTV),]
-  
  
-  
-     
+ 
+   
+   
+   
+   # Convert SI_STATE to binary (0/1) format
+   
+   tacsatp$SI_STATE <- ifelse(tacsatp$SI_STATE == "f", 1, 0)
+   
+   # Filter rows where SI_STATE is 1
+   # tacsatEflalo <- tacsatp[tacsatp$SI_STATE == 1,]
+   
+   tacsatp <- tacsatp[tacsatp$SI_STATE == 1,] ; dim(tacsatp)
+   tacsatp <- tacsatp[!is.na(tacsatp$INTV),] ; dim(tacsatp)
+   
   
   #Set catch date to be equal to SI_DATE 
   ## THIS IS ONLY A REQUIREMENT FOR RUN SPLITAMONGPINGS2 
@@ -241,30 +319,63 @@ for(year in yearsToSubmit){
   tacsatp <- as.data.frame(tacsatp)
   
   # Distribute landings among pings, first by day, metier and trip; then by metier and trip; then by trip
-  tacsatEflalo <- splitAmongPings2(tacsatp, eflaloM) # was originally splitAmongPings2(tacsatp, eflalo)
   
- 
-  
-  ## Get the summary of dispatched landing values to VMS records 
-  
-  
-  tot_kg_eflalo = eflalo |> summarise(total = sum ( LE_KG_TOT)  ) |> pull() 
-  tot_kg_eflaloM = eflaloM |> summarise(total = sum ( LE_KG_TOT)  ) |> pull() 
-  tot_kg_eflaloTacsat = tacsatEflalo |> summarise(total = sum ( LE_KG_TOT)) |> pull() 
-  summary_landings_tacsatEflalo = data.frame ( ref = c(  "total_landings_kg_eflalo ","total_landings_kg_eflaloM", "total_landings_kg_tacsat_eflalo"  ) , 
-               total = c(  tot_kg_eflalo,  tot_kg_eflaloM   ,  tot_kg_eflaloTacsat )   ) |> 
-    add_row (  ref = "eflaloM - tacsatEflalo total kg", total =  tot_kg_eflaloM - tot_kg_eflaloTacsat  )
-    
-    save(
-      summary_landings_tacsatEflalo,
-      file = file.path(outPath, paste0("summary_landings_tacsatEflalo", year, ".RData"))
+  tacsatEflalo_0p77 <-
+    splitAmongPings_0p77(
+      tacsat = tacsatp,
+      eflalo = eflalo,
+      variable = "all",
+      level = c("day","ICESrectangle","trip"),
+      conserve = TRUE, 
+      by = "INTV"
     )
+  
+  
+  tacsatEflalo = tacsatEflalo_0p77[[1]] 
+  stats_splitamongpings = tacsatEflalo_0p77[[2]] |> mutate(year = year )
+  
+  save(
+    tacsatEflalo ,
+    file = file.path(outPath, paste0("tacsatEflalo_", year, ".RData"))
+  )
+  
+  print( paste0("Saved the result of SplitAmongPings_", year))
+  
+  save(
+    stats_splitamongpings ,
+    file = file.path(outPath, paste0("tacsatEflalo_summary_split_kg.RData", year))
+  )
+  
+  
+  print( paste0("Saved the stats of SplitAmongPings_", year))
+  
+  
+              #-------------------------------------------------------------------------------------------------
+              ## QC 3:  Get the summary of dispatched landing values to VMS records 
+              #-------------------------------------------------------------------------------------------------
+              
+              
+  
+              tot_kg_eflalo = eflalo |> summarise(total = sum ( LE_KG_TOT)  ) |> pull() 
+              tot_kg_eflaloM = eflaloM |> summarise(total = sum ( LE_KG_TOT)  ) |> pull() 
+              tot_kg_eflaloNM = eflaloNM |> summarise(total = sum ( LE_KG_TOT)  ) |> pull() 
+              tot_kg_eflaloTacsat = tacsatEflalo |> summarise(total = sum ( LE_KG_TOT, na.rm = T)) |> pull() 
+              summary_landings_tacsatEflalo = data.frame ( ref = c(  "total_landings_kg_eflalo","total_landings_kg_eflaloM","total_landings_kg_eflaloNM",  "total_landings_kg_tacsat_eflalo"  ) , 
+                                                           total = c(  tot_kg_eflalo,  tot_kg_eflaloM   , tot_kg_eflaloNM   , tot_kg_eflaloTacsat )   ) |> 
+                add_row (  ref = "eflaloM - tacsatEflalo total kg", total  =  round(tot_kg_eflaloM - tot_kg_eflaloTacsat, 2 )   ) |> 
+                add_row (  ref = "eflalo  - tacsatEflalo total kg", total  =  round(tot_kg_eflalo  - tot_kg_eflaloTacsat, 2)   )
+              
+              ########## ADD THE 
+              
+              save(
+                summary_landings_tacsatEflalo,
+                file = file.path(outPath, paste0("splitAmongPings_comparison/qc3_summary_landings_tacsatEflalo_", year, ".RData"))
+              )
+              
+              print( paste0("Saved the summary stats of tacsatEflalo_", year))
+                
+              #QC3 END -------------------------------------------------------------------------------------------------------------
     
-    
-    save(
-      tacsatEflalo,
-      file = file.path(outPath, paste0("tacsatEflalo", year, ".RData"))
-    )
     
     
     ### IDENTIFY THE EFLALO RECORD WITH NOT RELATED VMS /TACSAT DATA 

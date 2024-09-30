@@ -23,8 +23,8 @@ library(tcltk)
 
 # Set paths
 # path <- paste0(getwd(), "/") # Working directory
-path <- 'Z:\\FISHERIES M MoU\\Working_Area\\spatial_fisheries_data\\ices_datacalls\\ices_vms_lb_datacall_2024\\'
-# datapath <- paste0('Y:\\FISHERIES M MoU\\Working_Area\\spatial_fisheries_data\\ices_datacalls\\ices_vms_lb_datacall_2024\\data') # Data  directory
+path <- 'C:/Users/RM12/OneDrive - CEFAS/Roi/projects/datacalls/ices/march_2024/ICES-VMS-and-Logbook-Data-Call_Cefas/'
+#  path <- paste0('Y:\\FISHERIES M MoU\\Working_Area\\spatial_fisheries_data\\ices_datacalls\\ices_vms_lb_datacall_2024\\') # Data  directory
 
 data_path <- paste0(path, 'data') # Data  directory
 codePath  <- paste0(path, "Scripts/")   # Location to store R scripts
@@ -53,8 +53,54 @@ if(!file.exists(paste0(dataPath, "hab_and_bathy_layers.zip"))){
   unzip(paste0(dataPath, "hab_and_bathy_layers.zip"), exdir = dataPath, overwrite = TRUE, junkpaths = TRUE)
 }
 
+# Necessary setting for spatial operations
+sf::sf_use_s2(FALSE)
+
 eusm <- readRDS(paste0(dataPath, "hab_and_bathy_layers\\eusm.rds"))
 eusm <- eusm %>% st_transform(4326)
+
+res = st_is_valid ( eusm) 
+
+table(res)
+
+eusm_invalid = eusm[!res, ]
+
+
+eusm_invalid1 =  eusm_invalid |> st_make_valid()
+res1 = eusm_invalid1|> st_is_valid()
+table ( res1)
+
+
+
+eusm_invalid2  = eusm_invalid1[!res1 , ]
+res1 = eusm_valid1|> st_is_valid()
+
+eusm_invalid2 = eusm_valid1[!res1, ]
+eusm_invalid2_valid  =  eusm_invalid2 |> st_make_valid()
+res2 = eusm_invalid2_valid|> st_is_valid()
+table ( res2)
+
+
+sf_use_s2(FALSE)
+
+eusm_valid3 = eusm_invalid2_valid[!res2, ]
+eusm_invalid3_valid  =  eusm_valid3 |> st_make_valid()
+res3 = eusm_invalid3_valid|> st_is_valid()
+table ( res3)
+
+eusm_invalid3_valid |> st_simplify(preserveTopology = T, dTolerance = 0.001)
+
+
+
+eusm_valid3[!res3, ] |>  ggplot() + geom_sf()
+
+eusm_novalid3_simple = eusm_valid3[!res3, ] |> st_ma
+  st_simplify(preserveTopology = T, dTolerance = 0.001)
+
+
+
+
+
 bathy <- readRDS(paste0(dataPath, "hab_and_bathy_layers\\ICES_GEBCO.rds"))
 bathy <- bathy %>% st_set_crs(4326)
 
@@ -232,6 +278,8 @@ valid_metiers <- fread("https://raw.githubusercontent.com/ices-eg/RCGs/master/Me
 trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
   
   
+  ### 1. Obtain the Fishing trips with more than one entry of the selected attribute  ( e.g. more than one GEAR used in a fishing trip)
+  
   if(col == "LE_MET"){
     tst <- data.table(eflalo)[get(col) %in% valid_metiers & !is.na(get(col)) ,.(uniqueN(get(col))), by=.(FT_REF)]
   }else{
@@ -244,9 +292,16 @@ trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
     return(data.frame())
   }
   
+  ### 2. Filter  the EFLALO records with more than entry of a selected attribute 
+  
   e <- data.table(eflalo)[FT_REF %in% tst[V1>1]$FT_REF]
   
+  ### 3. Filter  the TACSAT records with more than entry of a selected attribute 
+  
   tz <- data.table(tacsatp)[FT_REF  %in% tst[V1>1]$FT_REF]
+  
+  
+  ### 4. Remove the seleted attribute form teh TACSAT data  , to be joined afterwards ( e.g. LE_GEAR) 
   
   tz[, (col) := NULL]
   
@@ -263,13 +318,18 @@ trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
   
   if(trust_logbook){
     
-    ## First bind by landing date
+    ### 5.   First attempt to JOIN the EFLALO LOG EVENT DATE with the VMS  date-time stamp (  SI_SIGHTING date   ) 
+    
+    ### 5.1   Get the first row by TRIP and LOG EVENT DATE( LE_CDAT)
     
     e2 <- e[,.(get(col)[length(unique(get(col))) == 1]), by = .(FT_REF, LE_CDAT)]
     
     names(e2) <- c("FT_REF", "LE_CDAT", col)
     
     e2 = unique ( e2)
+    
+    ### 5.2   Join that record to the TACSAT data by Trip ID and SIGTHING and Log Event DATE
+    
     
     tz1 <- tz |> 
       left_join(e2, by = c("FT_REF" = "FT_REF", "SI_DATE" = "LE_CDAT"))
@@ -332,7 +392,11 @@ trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
     # tz_all
     #   }
     
-    # Bind to the category with most value
+    
+    
+    ### 6. The records not joined by DATE of the VMS and Log Event are filled with the most relevant selected attribute . ( e.g. the GEAR with highest landings reported)
+    
+    # Bind to the category with most landings weight value
     
     if( nrow(tz2 %>%  filter ( is.na ( get(col)  ))) > 0  ){
       
@@ -340,6 +404,9 @@ trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
       tz3 = tz2 %>%  filter ( FT_REF %in% ft_ref_isna ) %>%  as.data.frame()
       tz4 = tz3 |> filter ( is.na ( get(col) ) )
       e2 = e %>%  filter ( FT_REF %in% ft_ref_isna )
+      
+      ### 6.1. Get the attribute with more landings reported  ( e.g. if 2 gears were reproted in a fishign tirp , chose the one with more species landings reported)
+      
       
       
       if(!"LE_KG_TOT" %in% names(e2)){
@@ -358,6 +425,7 @@ trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
       
     }
     
+    ### 7 . Bind the TACSAT data  joined by DATE with the filled with the highest category value
     
     tz_col_na =   tz2 %>%  filter(  !is.na ( get( col) ))   
     tz_all =  rbind (tz_col_na , tz5 )  
@@ -365,6 +433,7 @@ trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
     
     #tacsatp_fill <- rbindlist(  list( tacsatp_u_col , tz_all  )    , fill = T)
     
+    ### 8 . Return the TACSAT records with the assigned EFLALO attribute 
     
     return(tz_all)
     
@@ -375,8 +444,11 @@ trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
 
 
 # splitAmongPings2 <- function(tacsatp, eflalo, conserve = c("Day", "Metier") {
+
 splitAmongPings2 <- function(tacsatp, eflalo) {
   require(data.table)
+  
+  ## Filter the VSM records with VMS records identified as Fishing 
   
   t <- data.table(tacsatp)[ SI_STATE == 1]
   e <- data.table(eflalo)
@@ -384,59 +456,142 @@ splitAmongPings2 <- function(tacsatp, eflalo) {
   if(any(is.na(t$INTV)))
     stop("NA values in intervals (INTV) in tacsatp, please add an interval to all pings")
   
+  ###  Creates a new field called SI_DATE , to be joined later step to teh VMS data 
+  
   e[, SI_DATE := LE_CDAT]
+  
   #find all column names with KG or EURO in them
   kg_euro <- grep("KG|EURO", colnames(e), value = T)
   
-  ### sum by FT_REF, LE_MET, SI_DATE
+  ##############################################
+  ###### 1. Merge by Match Level 0.a)   FT_REF, LE_MET, SI_DATE 
+  ##############################################
+  
+  ### sum LE_KG and LE_EURO cols by FT_REF ( fishing trip ) , LE_MET ( gear ) , SI_DATE  ( day ) 
+  ### and creates the ide1 column with the ID for each Eflalo record 
   
   n1 <- e[FT_REF %in% t$FT_REF,lapply(.SD,sum, na.rm = T),by=.(FT_REF, LE_MET, SI_DATE),
           .SDcols=kg_euro][, ide1 := 1:.N]
   
+  ## set the keys for TACSAT and the n1 dataset . The keys are the group levels 
+  
   setkey(t, FT_REF, LE_MET, SI_DATE)
   setkey(n1, FT_REF, LE_MET, SI_DATE)
   
+  ## Merge Eflalo (n1 ) and TACSAT ( t) based on the keys attributes. 
+  ## OUTPUT: Each  VMS records have  the total LE_KG for the sum by groups in this match level 
+  
   ts1 <- merge(t, n1)
   
+  ## Set the keys in the merged ts1 dataset on the groups of this match level 
+  
   setkey(ts1, FT_REF, LE_MET, SI_DATE)
+  
+  ## Calculate the 'time Weighting' variable = the proportion of each VMS time interval of the total by the groups for htis match level 
   ts1[,Weight:=INTV/sum(INTV, na.rm = T), by=.(FT_REF, LE_MET, SI_DATE)]
+  
+  ### Multiplies the weight of each VMS records time interval  by the LE_KG sum . 
+  ### OUTPUT: The proportion of LE_KG  related to each  VMS record 'time INTV weight' 
+  
   ts1[,(kg_euro):= lapply(.SD, function(x) x * Weight), .SDcols=kg_euro]
   
-  ### sum by FT_REF, LE_MET
+  ##############################################
+  ###### 2. Merge by Match Level 0.b)   FT_REF, LE_MET 
+  ##############################################
+  
+  ###  Filter out the EFLALO records already distributed in Match Level 0.a) to retain remaining records
+  ### sum LE_KG and LE_EURO cols by FT_REF ( fishing trip ) , LE_MET  ( gear ) 
+  ### and creates the ide2 column with the ID for each Eflalo record 
+  
   n2 <- n1[ide1 %!in% ts1$ide1, lapply(.SD,sum, na.rm = T),by=.(FT_REF, LE_MET),
            .SDcols=kg_euro][, ide2 := 1:.N]
+  
+  ## set the keys for TACSAT and the n2 dataset . The keys are the group  categories  for this match level 
+  ## The VMS records remains the same all the match levels  , only the eflalo records are filtered to the next steps
   
   setkey(t, FT_REF, LE_MET)
   setkey(n2, FT_REF, LE_MET)
   
+  ## Merge Eflalo (n2 ) and TACSAT ( t) based on the keys attributes. 
+  ## OUTPUT: Each  VMS records have  the total LE_KG for the sum by groups in this match level 
+  
   ts2 <- merge(t, n2)
   
+  ## Set the keys in the merged ts2 dataset on the groups of this match level 
+  
   setkey(ts2, FT_REF, LE_MET)
+  
+  ## Calculate the 'time Weighting' variable = the proportion of each VMS time interval of the total by the groups for htis match level 
+  
   ts2[,Weight:=INTV/sum(INTV, na.rm = T), by=.(FT_REF, LE_MET)]
+  
+  ### Multiplies the weight of each VMS records time interval  by the LE_KG sum . 
+  ### OUTPUT: The proportion of LE_KG  related to each  VMS record 'time INTV weight' 
+  
   ts2[,(kg_euro):= lapply(.SD, function(x) x * Weight), .SDcols=kg_euro]
   
   
-  ### sum by FT_REF
+  
+  
+  
+  ##############################################
+  ###### 3. Merge by Match Level 0.b)   FT_REF   ( fishing trip ) 
+  ##############################################
+  
+  ###  Filter out the EFLALO records already distributed in Match Level 0.b) to retain remaining records
+  ### sum LE_KG and LE_EURO cols by FT_REF ( fishing trip )   
+  ### and creates the ide3 column with the ID for each Eflalo record 
+  
   n3 <- n2[ide2 %!in% ts2$ide2, lapply(.SD,sum, na.rm = T),by=.(FT_REF),
            .SDcols=kg_euro][, ide3 := 1:.N]
+  
+  ## set the keys for TACSAT and the n3 dataset . The keys are the group  categories  for this match level 
+  ## The VMS records remains the same all the match levels  , only the eflalo records are filtered to the next steps
   
   setkey(t, FT_REF)
   setkey(n3, FT_REF)
   
+  
+  ## Merge Eflalo (n3 ) and TACSAT ( t) based on the keys attributes. 
+  ## OUTPUT: in ts3 dataset,  each  VMS records have  the total LE_KG for the sum by groups in this match level 
+  
   ts3 <- merge(t, n3)
   
+  ## Set the keys in the merged ts2 dataset on the groups of this match level 
+  
   setkey(ts3, FT_REF)
+  
+  ## Calculate the 'time Weighting' variable = the proportion of each VMS time interval of the total by the groups for htis match level 
+  
   ts3[,Weight:=INTV/sum(INTV, na.rm = T), by=.(FT_REF)]
+  
+  ### Multiplies the weight of each VMS records time interval  by the LE_KG sum . 
+  ### OUTPUT: The proportion of LE_KG  related to each  VMS record 'time INTV weight' 
   ts3[,(kg_euro):= lapply(.SD, function(x) x * Weight), .SDcols=kg_euro]
   
+  ##############################################
+  ###### 4. Combines the results of Match Level 0 a) , b) and c ) 
+  ##############################################
   
-  #Combine all aggregations
+  ## Bind the rows resulted from Step 1 o 3 and match logbook records to VMS by match level 0 a) , b) and c) 
+  
   ts <- rbindlist(list(t, ts1, ts2, ts3), fill = T)
+  
+  ## Remove the axuliary variables used in the outputs for each step 
   ts[ ,`:=`(Weight = NULL, ide1 = NULL, ide2 = NULL, ide3 = NULL)]
+  
+  ### Get the  name of the columns that are not in LE_KG or LE_EURO 
+  
   diffs = setdiff(names(ts), kg_euro)
+  
+  ###  SUM the LE_KG and LE_EURO vlaues by the other attributes ( in diffs vector) 
   
   out <- ts[,lapply(.SD,sum, na.rm = T),by=diffs,
             .SDcols=kg_euro]
+  
+  
+  ###  Return the final output with VMS record sand aporitoned landings values 
+  
   
   return(data.frame(out))
   
