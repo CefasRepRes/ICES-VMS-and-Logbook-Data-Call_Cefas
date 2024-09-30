@@ -14,8 +14,13 @@ library(lubridate)
 library(sf)
 library(ggplot2)
 library(tcltk)
+library(rmapshaper)
+library(raster)
+library(sfdSAR)
+library(glue)
+library(gt)
 
-#setwd("C:/Users/MD09/OneDrive - CEFAS/projects/datacalls/ices/2024")
+#setwd("")
 
 # year <- 2023
 # yearsToSubmit <- 2023
@@ -103,6 +108,9 @@ eusm_novalid3_simple = eusm_valid3[!res3, ] |> st_ma
 
 bathy <- readRDS(paste0(dataPath, "hab_and_bathy_layers\\ICES_GEBCO.rds"))
 bathy <- bathy %>% st_set_crs(4326)
+
+# Necessary setting for spatial operations
+sf::sf_use_s2(FALSE)
 
 #'------------------------------------------------------------------------------
 # 0.2 Settings for analysis                                                 ----
@@ -1561,4 +1569,115 @@ add_subsurface_swept_area <- function(x, met_name = "LE_MET", oal_name = "VE_LEN
   
   
   return(vms$subsurface)
+}
+
+predict_gear_width_mod <- function(model, coefficient, data) {
+  coeffs <- unique(coefficient)
+  coeffs <- coeffs[!is.na(coeffs)]
+  gear_widths <- icesVMS::get_benthis_parameters()
+  x <- rep(NA, nrow(data))
+  for (coeff in coeffs) {
+    cwhich <- which(coefficient == coeff)
+    x[cwhich] <- as.numeric(data[[coeff]][cwhich])
+  }
+  mods <- unique(model)
+  mods <- mods[!is.na(mods)]
+  output <- rep(NA, nrow(data))
+  for (mod in mods) {
+    fun <- match.fun(mod)
+    mwhich <- which(model == mod)
+    a_b <- gear_widths[gear_widths$gearModel == mod & gear_widths$gearCoefficient == coefficient[mwhich][1], c("firstFactor", "secondFactor")]
+    if (nrow(a_b) > 0) {
+      a <- as.numeric(a_b$firstFactor)
+      b <- as.numeric(a_b$secondFactor)
+      x_subset <- as.numeric(x[mwhich])
+      output[mwhich] <- fun(a, b, x_subset)
+    }
+  }
+  output
+}
+
+
+# Define a function to add gear width to metier
+add_gearwidth <- function(x, met_name = "LE_MET", oal_name = "VE_LEN", kw_name = "VE_KW"){
+  
+  require(data.table)
+  require(dplyr)
+  require(sfdSAR)
+  require(icesVMS)
+  
+  setDT(x)
+  ID <- c(oal_name, kw_name)
+  x[,(ID):= lapply(.SD, as.numeric), .SDcols = ID]
+  x[, Metier_level6 := get(met_name)]
+  
+  
+  #Updated metiers
+  metier_lookup <- fread("https://raw.githubusercontent.com/ices-eg/RCGs/master/Metiers/Reference_lists/RDB_ISSG_Metier_list.csv")
+  
+  if(any(x[, get(met_name)] %!in% metier_lookup$Metier_level6))
+    stop(paste("Non valid metiers in tacsatEflalo:", paste(x[x[, get(met_name)] %!in% metier_lookup$Metier_level6][, get(met_name)], collapse = ", ")))
+  
+  gear_widths <- get_benthis_parameters()
+  
+  aux_lookup <- data.table(merge(gear_widths, metier_lookup, by.x = "benthisMet", by.y = "Benthis_metiers", all.y = T))
+  aux_lookup <- aux_lookup[,.(Metier_level6, benthisMet, avKw, avLoa, avFspeed, subsurfaceProp, gearWidth, firstFactor, secondFactor, gearModel, 
+                              gearCoefficient, contactModel)]
+  
+  aux_lookup <<- unique(aux_lookup)
+  
+  
+  aux_lookup <- data.table(merge(gear_widths, metier_lookup, by.x = "benthisMet", by.y = "Benthis_metiers", all.y = T))
+  aux_lookup <- aux_lookup[,.(Metier_level6, benthisMet, avKw, avLoa, avFspeed, subsurfaceProp, gearWidth, firstFactor, secondFactor, gearModel, 
+                              gearCoefficient, contactModel)]
+  
+  aux_lookup[gearCoefficient == "avg_kw", gearCoefficient := kw_name]
+  aux_lookup[gearCoefficient == "avg_oal", gearCoefficient := oal_name]
+  
+  aux_lookup <- unique(aux_lookup)
+  
+  vms <- x |> 
+    left_join(aux_lookup, by = "Metier_level6")
+  
+  vms$gearWidth_model <-
+    predict_gear_width(vms$gearModel, vms$gearCoefficient, vms)
+  
+  if("avg_gearWidth" %!in% names(vms))
+    vms[, avg_gearWidth := NA]
+  
+  
+  gearWidth_filled <-
+    with(vms,
+         ifelse(!is.na(avg_gearWidth), avg_gearWidth,
+                ifelse(!is.na(gearWidth_model), gearWidth_model,
+                       gearWidth)
+         ))
+  
+  return(gearWidth_filled)
+}
+
+
+# retieved from: https://github.com/ices-tools-dev/sfdSAR/blob/master/R/predict_gear_width.R
+predict_gear_width <- function(model, coefficient, data) {
+  
+  # get coefficients
+  coeffs <- unique(coefficient)
+  coeffs <- coeffs[!is.na(coeffs)]
+  x <- rep(NA, nrow(data))
+  for (coeff in coeffs) {
+    cwhich <- which(coefficient == coeff)
+    x[cwhich] <- data[[coeff]][cwhich]
+  }
+  
+  # apply the model
+  mods <- unique(model)
+  mods <- mods[!is.na(mods)]
+  output <- rep(NA, nrow(data))
+  for (mod in mods) {
+    fun <- match.fun(mod)
+    mwhich <- which(model == mod)
+    output[mwhich] <- with(data[mwhich,], fun(firstFactor, secondFactor, x[mwhich]))
+  }
+  
+  output
 }

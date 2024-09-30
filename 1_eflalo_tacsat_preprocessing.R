@@ -40,8 +40,8 @@ source("C:/Users/MD09/Documents/git/ICES-VMS-and-Logbook-Data-Call_Cefas/global-
 
 #### MIKE: Try initially only with 2023 data 
 
-yearsToSubmit = 2009
-year = 2009
+yearsToSubmit = 2009:2023
+# year = 2009
 
 # Looping through the years to submit
 for(year in yearsToSubmit){
