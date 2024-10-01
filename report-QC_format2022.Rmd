@@ -7,6 +7,8 @@ output:
     fig_height: 4
     toc: yes
     toc_float: true
+editor_options: 
+  chunk_output_type: console
 ---
 
 <!-- QCTEMPLATE: header -->
@@ -22,13 +24,20 @@ library(tidyverse)
 library(knitr)
 library(icesVocab)
 library(DT)
+library(here)
 
 options(digits = 4)
+ 
 
 #Specify data path
-veDataPath <- "~/prj2/vms/ices_vms_data_call/delivery/iceland_annex1_2009_2022_2023-08-14.csv"
+# veDataPath <- here("Results\\ices_vms_lb_datacall_2024_outputs\\table1Save_2020_2023.csv")
+# 
+# leDataPath <- here("Results\\ices_vms_lb_datacall_2024_outputs\\table2Save_2020_2023.csv")
+veDataPath <- here("Results\\ices_vms_lb_datacall_2024_outputs\\table1Save_2020_2023.RData")
 
-leDataPath <- "~/prj2/vms/ices_vms_data_call/delivery/iceland_annex2_2009_2022_2023-08-14.csv"
+leDataPath <- here("Results\\ices_vms_lb_datacall_2024_outputs\\table2Save_2020_2023.RData")
+ 
+
 
 
 
@@ -145,10 +154,11 @@ CSquare2LonLat <- function(csqr,degrees){
 return(data.frame(SI_LATI=lat,SI_LONG=lon))}
 
 read_le <- function(file) {
-  read.csv(file,
-           header = FALSE,
-           na.strings = "NULL") %>% 
-    tidyr::as_tibble() %>% 
+  # read.csv(file,
+  #          header = FALSE,
+  #          na.strings = "NULL") %>% 
+  
+get ( load ( file ) |> tidyr::as_tibble() |>select ( value  ) |>  pull( )  ) %>% 
     dplyr::rename(type = 1,
                   country = 2,
                   year = 3,
@@ -171,10 +181,10 @@ read_le <- function(file) {
 }
 read_ve <- function(file) {
   
- read.csv(file,
-           header = FALSE,
-           na.strings = "NULL") %>% 
-    tidyr::as_tibble() %>% 
+ # read.csv(file,
+ #           header = FALSE,
+ #           na.strings = "NULL") %>% 
+get ( load ( file ) |> tidyr::as_tibble() |>select ( value  ) |>  pull( )  ) %>% 
     dplyr::rename(type = 1,
                   country = 2,
                   year = 3,
@@ -186,15 +196,19 @@ read_ve <- function(file) {
                   target = 9,
                   metier6 = 10,
                   lclass = 11,
-                  speed = 12,
-                  effort = 13,             # units in hours
-                  int = 14,                # average interval
-                  length = 15,             # average vessel length
-                  kw = 16,                 # average kw
-                  kwh = 17,                # kw x effort
-                  catch = 18,
-                  value = 19,
-                  gearwidth = 20) %>%
+                  habitat = 12, 
+                  depth = 13, 
+                  n_records = 14, 
+                  speed = 15,
+                  effort = 16,             # units in hours
+                  int = 17,                # average interval
+                  length = 18,             # average vessel length
+                  kw = 19,                 # average kw
+                  kwh = 20,                # kw x effort
+                  sa = 21, 
+                  catch = 22,
+                  value = 23,
+                  gearwidth = 24) %>%
 #                  spread = 21) %>% 
     dplyr::mutate(value = as.numeric(value))
 }
@@ -673,13 +687,14 @@ ve %>%
 ```{r price}
 ve %>% 
   group_by(year, gear) %>% 
-  summarise(ppkg = median(value/catch),
+  summarise(ppkg = median(value/catch, na.rm = T)    ,
             .groups = "drop") %>% 
   spread(year, ppkg) %>% 
   kable(caption = "Median value per kg")
+
 ve %>% 
   group_by(year, gear) %>% 
-  summarise(ppkg = median(value/catch),
+  summarise(ppkg = median(value/catch, na.rm = T),
             .groups = "drop") %>% 
   ggplot(aes(year, ppkg)) +
   geom_line() +
@@ -999,7 +1014,7 @@ datatable(VECountryErr)
 Check VMS GearType with ICES vocabulary //vocab.ices.dk/?ref=1498
 ```{r}
 #Check VMS GearType
-GearType <- getCodeList("GearTypeL4")
+GearType <-  getCodeList("GearType")
 GearType$VocabGear <- GearType$Key
 
 VEGear <- left_join(ve, GearType, by = c("gear" = "Key"))%>%
@@ -1699,7 +1714,7 @@ datatable(LECountryErr)
 Check Logbook GearType with ICES vocabulary //vocab.ices.dk/?ref=1498
 ```{r}
 #Check Logbook GearType
-GearType <- getCodeList("GearTypeL4")
+GearType <- getCodeList("GearType")
 GearType$VocabGear <- GearType$Key
 
 LEGear <- left_join(le, GearType, by = c("gear" = "Key"))%>%
@@ -1731,7 +1746,7 @@ datatable(LETargetAssemblageErr)
 Check Logbook VesselLength with ICES vocabulary //vocab.ices.dk/?ref=1502
 ```{r}
 #Check Logbook VesselLength
-VesselLength <- getCodeList("BYC_VesselLRange")
+VesselLength <- getCodeList("VesselLengthClass")
 VesselLength$VocabVesselLength <- VesselLength$Key
 
 LEVesselLength <- left_join(le, VesselLength, by = c("lclass" = "Key"))%>%

@@ -4,6 +4,7 @@
 # 2: Linking TACSAT and EFLALO data                                       ----
 #
 #'------------------------------------------------------------------------------
+library(dplyr)
 
 setwd("C:/Users/MD09/OneDrive - CEFAS/projects/datacalls/ices/2024")
 
@@ -182,7 +183,7 @@ load(file =   file.path(fish_array, paste0("fishing_speed_met5_array_2024.RData"
 # Looping through the years to submit
 for(year in yearsToSubmit){
   
-  
+
   print(year)
   #####################################################################
   ### Identify Fishing Activity  - TACSAT/VMS records as fishing  #####
@@ -203,10 +204,11 @@ for(year in yearsToSubmit){
   
   join_q = join_by(LE_L5MET, between ( SI_SP, min, max) )
   tacsatp = tacsatp |>  left_join( fishing_speed_met5_array  , by = join_q )
-  
+
   tacsatp = tacsatp |>  mutate ( SI_STATE = ifelse ( is.na (min) & is.na (max) , 's', 'f')) |>  select( -colnames (fishing_speed_met5_array ))
   
   
+ 
   
   
   
@@ -248,15 +250,30 @@ for(year in yearsToSubmit){
   
   tacsatp <- as.data.frame(tacsatp)
   
+ 
+  
   # Distribute landings among pings, first by day, metier and trip; then by metier and trip; then by trip
   tacsatEflalo <- splitAmongPings2(tacsatp, eflaloM) # was originally splitAmongPings2(tacsatp, eflalo)
+ 
   
-  
+  tacsatEflalo_res = tacsatEflalo[[1]]
   save(
-    tacsatEflalo,
+    tacsatEflalo_res,
     file = file.path(outPath, paste0("tacsatEflalo", year, ".RData"))
   )
   
+  
+  if ( year == yearsToSubmit[1]) { 
+    
+    stats_all = tacsatEflalo[[2]]
+    stats_all = stats_all |> mutate ( year_a = year )
+    
+  } else { 
+    
+    stats_year = tacsatEflalo[[2]] |> mutate ( year_a = year )
+    print( stats_year)
+    stats_all =  rbind(  stats_all , stats_year )
+    }
   
   #-------------------------------------------------------------------------------------------------
   ## QC 3:  Get the summary of dispatched landing values to VMS records 
@@ -265,7 +282,7 @@ for(year in yearsToSubmit){
   
   tot_kg_eflalo = eflalo |> summarise(total = sum ( LE_KG_TOT)  ) |> pull() 
   tot_kg_eflaloM = eflaloM |> summarise(total = sum ( LE_KG_TOT)  ) |> pull() 
-  tot_kg_eflaloTacsat = tacsatEflalo |> summarise(total = sum ( LE_KG_TOT)) |> pull() 
+  tot_kg_eflaloTacsat = tacsatEflalo_res |> summarise(total = sum ( LE_KG_TOT)) |> pull() 
   summary_landings_tacsatEflalo = data.frame ( ref = c(  "total_landings_kg_eflalo","total_landings_kg_eflaloM", "total_landings_kg_tacsat_eflalo"  ) , 
                                                total = c(  tot_kg_eflalo,  tot_kg_eflaloM   ,  tot_kg_eflaloTacsat )   ) |> 
     add_row (  ref = "eflaloM - tacsatEflalo total kg", total =  tot_kg_eflaloM - tot_kg_eflaloTacsat  )
@@ -277,6 +294,11 @@ for(year in yearsToSubmit){
   
   
 } 
+
+save(
+  stats_all,
+  file = file.path(outPath, paste0("tacsatEflalo_stats_sap2_all_years.RData"))
+)
   
   
   
@@ -651,3 +673,28 @@ rm(speedarr, tacsatp, tacsatEflalo,
 #----------------
 # End of file
 #----------------
+
+
+
+
+#----------------
+# DATA SUBMISSION QC 
+#----------------
+
+
+library(dplyr)
+
+table1 = read.csv( here("Results\\ices_vms_lb_datacall_2024_outputs\\table1Save.csv") , header = T ) 
+
+colnames(table2)
+
+table1_20_23 = table1 |> filter ( SI_YEAR |> between(2020, 2023))
+
+ write.csv( x = table1_20_23 ,file =  here("Results\\ices_vms_lb_datacall_2024_outputs\\table1Save_2020_2023.csv") , na = "", row.names=FALSE, col.names=TRUE, sep=",", quote=FALSE)
+ 
+ 
+ 
+ table2 = read.csv( here("Results\\ices_vms_lb_datacall_2024_outputs\\table2Save.csv") , header = T ) 
+ table2_20_23 = table2 |> filter (  YEAR |> between(2020, 2023))
+ write.csv( x= table2_20_23, file =  here("Results\\ices_vms_lb_datacall_2024_outputs\\table2Save_2020_2023.csv") , na = "", row.names=FALSE, col.names=TRUE, sep=",", quote=FALSE)
+ 

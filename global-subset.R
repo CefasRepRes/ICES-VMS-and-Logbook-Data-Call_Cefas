@@ -14,7 +14,7 @@ library(lubridate)
 library(sf)
 library(ggplot2)
 library(tcltk)
-library(rmapshaper)
+#library(rmapshaper)
 library(raster)
 library(sfdSAR)
 library(glue)
@@ -475,9 +475,16 @@ splitAmongPings2 <- function(tacsatp, eflalo) {
   ###### 1. Merge by Match Level 0.a)   FT_REF, LE_MET, SI_DATE 
   ##############################################
   
+  
+  ###create the empty dataset for stats collection 
+  
+  stats_landings_level0a = data.frame ( match_level = paste ( c('FT_REF', 'LE_MET', 'SI_DATE'), collapse =  ',' )  , category = c( "kg in eflalo", "kg in merged tacsat"  ), total = 0 )
+  
+  
   ### sum LE_KG and LE_EURO cols by FT_REF ( fishing trip ) , LE_MET ( gear ) , SI_DATE  ( day ) 
   ### and creates the ide1 column with the ID for each Eflalo record 
   
+
   n1 <- e[FT_REF %in% t$FT_REF,lapply(.SD,sum, na.rm = T),by=.(FT_REF, LE_MET, SI_DATE),
           .SDcols=kg_euro][, ide1 := 1:.N]
   
@@ -503,9 +510,25 @@ splitAmongPings2 <- function(tacsatp, eflalo) {
   
   ts1[,(kg_euro):= lapply(.SD, function(x) x * Weight), .SDcols=kg_euro]
   
+  ##stats at each match level step 
+ 
+  stats_landings_level0a[1,'total' ] = round(sum(as.data.frame(n1)[,kg_euro[1]]))
+  try(print(  paste("kg in eflalo",   stats_landings_level0a[1,'total' ]   ) ))
+  
+  stats_landings_level0a[2,'total' ] = round(sum(as.data.frame(ts1) [,kg_euro[1]]))
+  try(print(paste("kg in merged tacsat", stats_landings_level0a[2,'total' ]  )))
+  
+  
+  
   ##############################################
   ###### 2. Merge by Match Level 0.b)   FT_REF, LE_MET 
   ##############################################
+  
+  
+  ###create the empty dataset for stats collection 
+  
+  stats_landings_level0b = data.frame ( match_level = paste ( c('FT_REF', 'LE_MET'), collapse = ',')  , category = c( "kg in eflalo", "kg in merged tacsat"  ), total = 0 )
+  
   
   ###  Filter out the EFLALO records already distributed in Match Level 0.a) to retain remaining records
   ### sum LE_KG and LE_EURO cols by FT_REF ( fishing trip ) , LE_MET  ( gear ) 
@@ -539,12 +562,25 @@ splitAmongPings2 <- function(tacsatp, eflalo) {
   ts2[,(kg_euro):= lapply(.SD, function(x) x * Weight), .SDcols=kg_euro]
   
   
+  ##stats at each match level step 
+  
+  stats_landings_level0b[1,'total' ] = round(sum(as.data.frame(n2) [,kg_euro[1]]))
+  try(print(  paste("kg in eflalo",   stats_landings_level0b[1,'total' ]   ) ))
+  
+  stats_landings_level0b[2,'total' ] = round(sum(as.data.frame(ts2) [,kg_euro[1]]))
+  try(print(paste("kg in merged tacsat", stats_landings_level0b[2,'total' ]  )))
   
   
   
   ##############################################
   ###### 3. Merge by Match Level 0.b)   FT_REF   ( fishing trip ) 
   ##############################################
+  
+  
+  ###create the empty dataset for stats collection 
+  
+  stats_landings_level0c = data.frame ( match_level = paste ( c('FT_REF'), collapse = ',' )  , category = c( "kg in eflalo", "kg in merged tacsat"  ), total = 0 )
+  
   
   ###  Filter out the EFLALO records already distributed in Match Level 0.b) to retain remaining records
   ### sum LE_KG and LE_EURO cols by FT_REF ( fishing trip )   
@@ -577,6 +613,14 @@ splitAmongPings2 <- function(tacsatp, eflalo) {
   ### OUTPUT: The proportion of LE_KG  related to each  VMS record 'time INTV weight' 
   ts3[,(kg_euro):= lapply(.SD, function(x) x * Weight), .SDcols=kg_euro]
   
+  ##stats at each match level step 
+  
+  stats_landings_level0c[1,'total' ] = round(sum(as.data.frame(n3) [,kg_euro[1]]))
+  try(print(  paste("kg in eflalo",   stats_landings_level0c[1,'total' ]   ) ))
+  
+  stats_landings_level0c[2,'total' ] = round(sum(as.data.frame(ts3) [,kg_euro[1]]))
+  try(print(paste("kg in merged tacsat", stats_landings_level0c[2,'total' ]  )))
+  
   ##############################################
   ###### 4. Combines the results of Match Level 0 a) , b) and c ) 
   ##############################################
@@ -597,11 +641,15 @@ splitAmongPings2 <- function(tacsatp, eflalo) {
   out <- ts[,lapply(.SD,sum, na.rm = T),by=diffs,
             .SDcols=kg_euro]
   
+  ### bind all the stats outpus 
+  
+  stats_landings_level_all = rbind(stats_landings_level0a, stats_landings_level0b, stats_landings_level0c)
+  
   
   ###  Return the final output with VMS record sand aporitoned landings values 
   
   
-  return(data.frame(out))
+  return(list ( tacsateflalo = data.frame(out), stats_landings_level_all ) ) 
   
 }
 

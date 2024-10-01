@@ -648,7 +648,7 @@ write.table(table2Save, file.path(outPath, "table2Save.csv"), na = "", row.names
 # R packages required to be installed:
 # install.packages(c("icesVMS", "icesConnect"), repos = "https://ices-tools-prod.r-universe.dev")  
 
-#library(icesVMS)
+ library(icesVMS)
 
 # Replace with your ICES user name and you will be requested with your password
 #icesConnect::set_username('submitter_ices_user_id') # e.g., 'lastname' not 'ices\lastname'
@@ -659,24 +659,7 @@ write.table(table2Save, file.path(outPath, "table2Save.csv"), na = "", row.names
 #screen_vms_file(file.path(outPath, "table1Save.csv"))  # Submit for screening Table 1
 #screen_vms_file(file.path(outPath, "table2Save.csv"))  # Submit for screening Table 2
 
-
-#'------------------------------------------------------------------------------
-# 3.8 Data call submission using ICESVMS package (OPTIONAL)                 ----
-#'------------------------------------------------------------------------------
-
-# R packages required to be installed:
-# install.packages(c("icesVMS", "icesConnect"), repos = "https://ices-tools-prod.r-universe.dev")  
-
-library(icesVMS)
-
-# Replace with your ICES user name and you will be requested with your password
-#icesConnect::set_username('submitter_ices_user_id') # e.g., 'lastname' not 'ices\lastname'
-
-#icesConnect::ices_token(refresh = TRUE)
-#icesConnect::decode_token()$Email # Check the email associated to your ices user name is the correct one
-
-#screen_vms_file(file.path(outPath, "table1Save.csv"))  # Submit for screening Table 1
-#screen_vms_file(file.path(outPath, "table2Save.csv"))  # Submit for screening Table 2
+ 
 
 #'------------------------------------------------------------------------------
 # End of script                                                             
