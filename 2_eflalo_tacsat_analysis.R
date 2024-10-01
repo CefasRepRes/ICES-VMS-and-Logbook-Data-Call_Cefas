@@ -140,10 +140,7 @@ for(year in yearsToSubmit){
               #QC1 END -------------------------------------------------------------------------------------------------------------
   
   
-<<<<<<< HEAD
-=======
-  # 645448       / dim(tacsatp)[1]
->>>>>>> 0b3284be3f9dd324d7302ec7a966d1faeeacafa1
+ 
   #################################################
   
   
@@ -191,14 +188,13 @@ for(year in yearsToSubmit){
    
   join_q = join_by(LE_L5MET, between ( SI_SP, min, max) )
   tacsatp = tacsatp |>  left_join( fishing_speed_met5_array  , by = join_q  )
+   
+   
+  ## Retain the ranges of speed for QC purposes to be able to see the MAX and MIN ranges. 
+  ## For analysis purposes the comment can be removed 
   
-<<<<<<< HEAD
-  tacsatp = tacsatp |>  mutate ( SI_STATE = ifelse ( is.na (min) & is.na (max) , 's', 'f')) #|>  select( -colnames (fishing_speed_met5_array ))
-=======
-  tacsatp = tacsatp |>  left_join( fishing_speed_met5_array  , by = join_q )
-  
-  tacsatp = tacsatp |>  mutate ( SI_STATE = ifelse ( is.na (min) & is.na (max) , 's', 'f')) |>  select( -colnames (fishing_speed_met5_array ))
->>>>>>> 0b3284be3f9dd324d7302ec7a966d1faeeacafa1
+  tacsatp = tacsatp |>  mutate ( SI_STATE = ifelse ( is.na (min) & is.na (max) , 's', 'f')) # |>  select( -colnames (fishing_speed_met5_array ))
+ 
   
   
   
@@ -333,8 +329,8 @@ for(year in yearsToSubmit){
   tacsatp <- as.data.frame(tacsatp)
   
   # Distribute landings among pings, first by day, metier and trip; then by metier and trip; then by trip
+ 
   
-<<<<<<< HEAD
   tacsatEflalo_0p77 <-
     splitAmongPings_0p77(
       tacsat = tacsatp,
@@ -342,8 +338,8 @@ for(year in yearsToSubmit){
       variable = "all",
       level = c("day","ICESrectangle","trip"),
       conserve = TRUE, 
-      by = "INTV"
-=======
+      by = "INTV" ) 
+ 
  
   
   ## Get the summary of dispatched landing values to VMS records 
@@ -352,6 +348,7 @@ for(year in yearsToSubmit){
   tot_kg_eflalo = eflalo |> summarise(total = sum ( LE_KG_TOT)  ) |> pull() 
   tot_kg_eflaloM = eflaloM |> summarise(total = sum ( LE_KG_TOT)  ) |> pull() 
   tot_kg_eflaloTacsat = tacsatEflalo |> summarise(total = sum ( LE_KG_TOT)) |> pull() 
+  
   summary_landings_tacsatEflalo = data.frame ( ref = c(  "total_landings_kg_eflalo ","total_landings_kg_eflaloM", "total_landings_kg_tacsat_eflalo"  ) , 
                total = c(  tot_kg_eflalo,  tot_kg_eflaloM   ,  tot_kg_eflaloTacsat )   ) |> 
     add_row (  ref = "eflaloM - tacsatEflalo total kg", total =  tot_kg_eflaloM - tot_kg_eflaloTacsat  )
@@ -359,8 +356,7 @@ for(year in yearsToSubmit){
     save(
       summary_landings_tacsatEflalo,
       file = file.path(paste0(outPath, "summary_landings_tacsatEflalo", year, ".RData"))
->>>>>>> 0b3284be3f9dd324d7302ec7a966d1faeeacafa1
-    )
+     )
   
   
   tacsatEflalo = tacsatEflalo_0p77[[1]] 
@@ -409,15 +405,13 @@ for(year in yearsToSubmit){
               #QC3 END -------------------------------------------------------------------------------------------------------------
     
     
-<<<<<<< HEAD
-=======
+ 
     save(
       tacsatEflalo,
       file = file.path(paste0(outPath, "tacsatEflalo", year, ".RData"))
     )
     
->>>>>>> 0b3284be3f9dd324d7302ec7a966d1faeeacafa1
-    
+     
     ### IDENTIFY THE EFLALO RECORD WITH NOT RELATED VMS /TACSAT DATA 
   
   

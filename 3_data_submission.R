@@ -8,8 +8,9 @@
 # setwd("C:/Users/MD09/OneDrive - CEFAS/projects/datacalls/ices/2024")
 
 source("C:\\Users\\MD09\\Documents\\git\\ICES-VMS-and-Logbook-Data-Call_Cefas\\global-subset.R")
+ 
 
-yearsToSubmit = 2009:2023
+  yearsToSubmit = 2009:2023
 # year = 2009
 
 # Loop through years to submit
@@ -18,6 +19,8 @@ for(year in yearsToSubmit){
   # load data
   load(file = paste0(outPath,paste0("/cleanEflalo2_",year,".RData")))
   load(file = paste0(outPath,paste0("/tacsatEflalo_hab_depth_",year,".RData")))  
+  
+  
   #'----------------------------------------------------------------------------
   # 3.1 Create table 2                                                    ----
   #'----------------------------------------------------------------------------
@@ -31,6 +34,11 @@ for(year in yearsToSubmit){
   
   # Create a record variable for aggregation of records per vessel
   eflalo$record <- 1
+  
+  ## Change teh Country of the vessel from UK countries to GBR 
+  
+  eflalo$VE_COU <- 'GB'
+  
   
   # Aggregate the dummy variable by VE_COU, VE_REF, and LE_CDAT
   res <- aggregate(
@@ -82,6 +90,11 @@ for(year in yearsToSubmit){
   
   # Define the record type
   RecordType <- "VE"
+  
+  ## Change teh Country of the vessel from UK countries to GBR 
+  
+  tacsatEflalo$VE_COU <- 'GB'
+  
   
   # Define the columns to be included in the table
   cols <- c(
