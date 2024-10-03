@@ -58,59 +58,16 @@ if(!file.exists(paste0(dataPath, "hab_and_bathy_layers.zip"))){
   unzip(paste0(dataPath, "hab_and_bathy_layers.zip"), exdir = dataPath, overwrite = TRUE, junkpaths = TRUE)
 }
 
-# Necessary setting for spatial operations
+# Necessary setting for spatial operations to avoid errors by INVALID GEOMETRIES ( EUSM is plenty of invalid gemoetries)
 sf::sf_use_s2(FALSE)
 
 eusm <- readRDS(paste0(dataPath, "hab_and_bathy_layers\\eusm.rds"))
 eusm <- eusm %>% st_transform(4326)
-
-res = st_is_valid ( eusm) 
-
-table(res)
-
-eusm_invalid = eusm[!res, ]
-
-
-eusm_invalid1 =  eusm_invalid |> st_make_valid()
-res1 = eusm_invalid1|> st_is_valid()
-table ( res1)
-
-
-
-eusm_invalid2  = eusm_invalid1[!res1 , ]
-res1 = eusm_valid1|> st_is_valid()
-
-eusm_invalid2 = eusm_valid1[!res1, ]
-eusm_invalid2_valid  =  eusm_invalid2 |> st_make_valid()
-res2 = eusm_invalid2_valid|> st_is_valid()
-table ( res2)
-
-
-sf_use_s2(FALSE)
-
-eusm_valid3 = eusm_invalid2_valid[!res2, ]
-eusm_invalid3_valid  =  eusm_valid3 |> st_make_valid()
-res3 = eusm_invalid3_valid|> st_is_valid()
-table ( res3)
-
-eusm_invalid3_valid |> st_simplify(preserveTopology = T, dTolerance = 0.001)
-
-
-
-eusm_valid3[!res3, ] |>  ggplot() + geom_sf()
-
-eusm_novalid3_simple = eusm_valid3[!res3, ] |> st_ma
-  st_simplify(preserveTopology = T, dTolerance = 0.001)
-
-
-
-
-
+ 
 bathy <- readRDS(paste0(dataPath, "hab_and_bathy_layers\\ICES_GEBCO.rds"))
 bathy <- bathy %>% st_set_crs(4326)
 
-# Necessary setting for spatial operations
-sf::sf_use_s2(FALSE)
+ 
 
 #'------------------------------------------------------------------------------
 # 0.2 Settings for analysis                                                 ----

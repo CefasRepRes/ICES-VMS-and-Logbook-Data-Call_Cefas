@@ -33,9 +33,9 @@ options(digits = 4)
 # veDataPath <- here("Results\\ices_vms_lb_datacall_2024_outputs\\table1Save_2020_2023.csv")
 # 
 # leDataPath <- here("Results\\ices_vms_lb_datacall_2024_outputs\\table2Save_2020_2023.csv")
-veDataPath <- here("Results\\ices_vms_lb_datacall_2024_outputs\\table1Save_2020_2023.RData")
+veDataPath <- here("Results\\ices_vms_lb_datacall_2024_outputs\\table1Save_2015_2023.RData")
 
-leDataPath <- here("Results\\ices_vms_lb_datacall_2024_outputs\\table2Save_2020_2023.RData")
+leDataPath <- here("Results\\ices_vms_lb_datacall_2024_outputs\\table2Save_2015_2023.RData")
  
 
 
@@ -1001,6 +1001,8 @@ Check VMS CountryCode with ICES vocabulary //vocab.ices.dk/?ref=337
 CountryCode <- getCodeList("ISO_3166")
 CountryCode$VocabCountry <- CountryCode$Key
 
+
+
 VECountry <- left_join(ve, CountryCode, by = c("country" = "Key"))%>%
   select(country, VocabCountry) %>%
   distinct()
@@ -1046,7 +1048,7 @@ datatable(VETargetAssemblageErr)
 Check VMS VesselLength with ICES vocabulary //vocab.ices.dk/?ref=1502
 ```{r}
 #Check VMS VesselLength
-VesselLength <- getCodeList("BYC_VesselLRange")
+VesselLength <- getCodeList("VesselLengthClass")
 VesselLength$VocabVesselLength <- VesselLength$Key
 
 VEVesselLength <- left_join(ve, VesselLength, by = c("lclass" = "Key"))%>%

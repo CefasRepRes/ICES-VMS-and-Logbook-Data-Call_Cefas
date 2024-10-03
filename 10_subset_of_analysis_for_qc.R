@@ -326,7 +326,7 @@ save(
   # Looping through the years to submit
   for(year in yearsToSubmit){
     
- 
+  #year = 2023
   print(year)
   #####################################################################
   ### Identify Fishing Activity  - TACSAT/VMS records as fishing  #####
@@ -348,7 +348,7 @@ save(
   join_q = join_by(LE_L5MET, between ( SI_SP, min, max) )
   tacsatp = tacsatp |>  left_join( fishing_speed_met5_array  , by = join_q )
   
-  tacsatp = tacsatp |>  mutate ( SI_STATE = ifelse ( is.na (min) & is.na (max) , 's', 'f')) |>  select( -colnames (fishing_speed_met5_array ))
+  tacsatp = tacsatp |>  mutate ( SI_STATE = ifelse ( is.na (min) & is.na (max) , 's', 'f')) |>  dplyr::select( -colnames (fishing_speed_met5_array ))
   
   
   
@@ -688,13 +688,16 @@ table1 = read.csv( here("Results\\ices_vms_lb_datacall_2024_outputs\\table1Save.
 
 colnames(table2)
 
-table1_20_23 = table1 |> filter ( SI_YEAR |> between(2020, 2023))
+table1_15_23 = table1 |> filter ( SI_YEAR |> between(2015, 2023))
 
- write.csv( x = table1_20_23 ,file =  here("Results\\ices_vms_lb_datacall_2024_outputs\\table1Save_2020_2023.csv") , na = "", row.names=FALSE, col.names=TRUE, sep=",", quote=FALSE)
+ write.csv( x = table1_15_23 ,file =  here("Results\\ices_vms_lb_datacall_2024_outputs\\table1Save_2015_2023.csv") , na = "", row.names=FALSE, col.names=TRUE, sep=",", quote=FALSE)
  
- 
+ save(table1_15_23, file =  here("Results\\ices_vms_lb_datacall_2024_outputs\\table1Save_2015_2023.RData") )
  
  table2 = read.csv( here("Results\\ices_vms_lb_datacall_2024_outputs\\table2Save.csv") , header = T ) 
- table2_20_23 = table2 |> filter (  YEAR |> between(2020, 2023))
- write.csv( x= table2_20_23, file =  here("Results\\ices_vms_lb_datacall_2024_outputs\\table2Save_2020_2023.csv") , na = "", row.names=FALSE, col.names=TRUE, sep=",", quote=FALSE)
+ table2_15_23 = table2 |> filter (  YEAR |> between(2015, 2023))
+ write.csv( x= table2_15_23, file =  here("Results\\ices_vms_lb_datacall_2024_outputs\\table2Save_2015_2023.csv") , na = "", row.names=FALSE, col.names=TRUE, sep=",", quote=FALSE)
+ 
+ save(table2_15_23, file =  here("Results\\ices_vms_lb_datacall_2024_outputs\\table2Save_2015_2023.RData") )
+ 
  

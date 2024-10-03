@@ -143,57 +143,79 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
       if(!"SI_YEAR" %in% colnames(eflaloTrip))  eflaloTrip$SI_YEAR    <- an(format(eflaloTrip$LE_CDATIM,format="%Y"))
       if(!"SI_DAY" %in%  colnames(eflaloTrip))  eflaloTrip$SI_DAY     <- an(format(eflaloTrip$LE_CDATIM,format="%j"))
       
-      #- Count pings in tacsat set
+      #- Calculate the total SUM of VMS records BY attribute by GROUP BY variables in the  formula 
       nPings                <- countPings(~VE_REF+FT_REF+icesrectangle+day,tacsatTrip,by=by)
       
-      #- Do the merging of eflalo to tacsat
+      #-Calculate the proportional weight of each VMS record and the total LE_KG and LE_EURO to each VMS record
       res           <- eflalo2Pings(eflalo = eflaloTrip,tacsat = tacsatTrip,pings = nPings,vars = c("VE_REF","FT_REF","LE_RECT","SI_DAY"),eflaloCol = eflaloCol[c(kgs,eur)],remainTacsat = remainTacsat,by=by)
+     
+      
+      ## Save results to track results and modify datasets needed in the follow up Match Level 
+      
       eflaloTrip    <- res[["eflalo"]]
       byDayTacsat   <- res[["tacsat"]]
       remainTacsat  <- res[["remainTacsat"]]
       stats_landings <- res[["stats_landings"]] 
+      stats_VMS      <- res[["stats_VMS"]] 
+      
+      
     }
+    
     if("ICESrectangle" %in% level){
+      
       print("level: rectangle")
       if(!"SI_YEAR" %in% colnames(tacsatTrip))  tacsatTrip$SI_YEAR    <- an(format(tacsatTrip$SI_DATIM,format="%Y"))
       if(!"LE_RECT" %in% colnames(tacsatTrip))  tacsatTrip$LE_RECT    <- ICESrectangle(tacsatTrip)
       
       if(!"SI_YEAR" %in% colnames(eflaloTrip))  eflaloTrip$SI_YEAR    <- an(format(eflaloTrip$LE_CDATIM,format="%Y"))
       
-      #- Count pings in tacsat set
+      #- Calculate the total SUM of VMS records BY attribute by GROUP BY variables in the  formula 
       nPings                <- countPings(~VE_REF+FT_REF+icesrectangle,tacsatTrip,by=by)
       
-      #- Do the merging of eflalo to tacsat
-      res           <- eflalo2Pings(eflaloTrip,tacsatTrip,nPings,c("VE_REF","FT_REF","LE_RECT"),        eflaloCol[c(kgs,eur)],remainTacsat,by=by)
-      eflaloTrip    <- res[["eflalo"]]
-      byRectTacsat  <- res[["tacsat"]]
-      remainTacsat  <- res[["remainTacsat"]]
-      stats_landings <- res[["stats_landings"]] |> rbind(stats_landings)
-    }
+      #-Calculate the proportional weight of each VMS record and the total LE_KG and LE_EURO to each VMS record
+      res           <- eflalo2Pings(eflaloTrip,tacsatTrip,nPings,c("VE_REF","FT_REF","LE_RECT"),eflaloCol[c(kgs,eur)],remainTacsat,by=by)
+      
+      ## Save results to track results and modify datasets needed in the follow up MAtch Level 
+      
+      eflaloTrip    <- res[["eflalo"]]      ## EFLALO modified with the landings distributed removed
+      byRectTacsat  <- res[["tacsat"]]      ## The TACSAT with the calculated toal landings by GRPOUP and weight of each point
+      remainTacsat  <- res[["remainTacsat"]]   ## Remaining ID's of the TACSAT that have not been matched 
+      stats_landings <- res[["stats_landings"]] |> rbind(stats_landings) ### Stats of distributed landings
+      stats_VMS      <- res[["stats_VMS"]] |> rbind(stats_VMS) 
+      
+      
+      }
+    
     if("trip" %in% level){
+      
       print("level: trip")
       if(!"SI_YEAR" %in% colnames(tacsatTrip))  tacsatTrip$SI_YEAR    <- an(format(tacsatTrip$SI_DATIM,format="%Y"))
       if(!"SI_YEAR" %in% colnames(eflaloTrip))  eflaloTrip$SI_YEAR    <- an(format(eflaloTrip$LE_CDATIM,format="%Y"))
       
-      #- Count pings in tacsat set
+      #- Calculate the total SUM of VMS records BY attribute by GROUP BY variables in the  formula 
       nPings                <- countPings(~VE_REF+FT_REF,tacsatTrip,by=by)
       
-      #- Do the merging of eflalo to tacsat
-      res           <- eflalo2Pings(eflaloTrip,tacsatTrip,nPings,c("VE_REF","FT_REF"),                  eflaloCol[c(kgs,eur)],remainTacsat,by=by)
+      #-Calculate the proportional weight of each VMS record and the total LE_KG and LE_EURO to each VMS record
+      res           <- eflalo2Pings(eflaloTrip,tacsatTrip,nPings,c("VE_REF","FT_REF"),eflaloCol[c(kgs,eur)],remainTacsat,by=by)
+     
       eflaloTrip    <- res[["eflalo"]]
       byTripTacsat  <- res[["tacsat"]]
       remainTacsat  <- res[["remainTacsat"]]
       stats_landings <- res[["stats_landings"]] |> rbind(stats_landings)
+      stats_VMS      <- res[["stats_VMS"]] |> rbind(stats_VMS) 
     }
     
     
     
     #-------------------------------------------------------------------------------
-    # 1b) Bind all tacsat files with matching FT_REF
+    # 1b) Bind all TACSAT datasets for each Match Level   of records with common  FT_REF
     #-------------------------------------------------------------------------------
     
     if(length(remainTacsat) > 0) warning("Not all tacsat records with tripnumber have been merged!!")
     if(nrow(eflaloTrip) > 0) warning("Not all eflalo records with matching VMS tripnumber have been merged!!")
+    
+    ### 1. Combine all the TACSAT results of efalo2pings function at each Match Level 0 
+    
     if("day"  %in% level & !"ICESrectangle" %in% level & !"trip" %in% level) tacsatFTREF <- byDayTacsat
     if(!"day" %in% level &  "ICESrectangle" %in% level & !"trip" %in% level) tacsatFTREF <- byRectTacsat
     if(!"day" %in% level & !"ICESrectangle" %in% level &  "trip" %in% level) tacsatFTREF <- byTripTacsat
@@ -202,7 +224,12 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
     if(!"day" %in% level &  "ICESrectangle" %in% level &  "trip" %in% level) tacsatFTREF <- rbind(byRectTacsat,byTripTacsat)
     if("day" %in% level &   "ICESrectangle" %in% level &  "trip" %in% level) tacsatFTREF <- rbind(byDayTacsat,byRectTacsat,byTripTacsat)
     
+    
+    
+    ### 2. Divide the summed total landings by  GROUP variables in each Match Level by the VMS record weights saved in 'pings' field
+    
     tacsatFTREF[,kgeur(colnames(tacsatFTREF))]    <- sweep(tacsatFTREF[,kgeur(colnames(tacsatFTREF))],1,tacsatFTREF$pings,"/")
+    
     tacsatFTREF$ID                                <- af(ac(tacsatFTREF$ID.x))
     DT                                            <- data.table(tacsatFTREF)
     eq1                                           <- c.listquote(paste("sum(",colnames(tacsatFTREF[,kgeur(colnames(tacsatFTREF))]),",na.rm=TRUE)",sep=""))
@@ -216,6 +243,7 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
   #- If you don't want to loose catch or value data, conserve the non-merged
   #   eflalo catches and distribute these over the tacsat records
   if(conserve == TRUE){
+    
     if(dim(tacsat)[1]>0 & dim(eflaloVessel)[1] > 0){
       
       #-------------------------------------------------------------------------------
@@ -239,6 +267,8 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
         eflaloVessel  <- res[["eflalo"]]
         byDayTacsat   <- res[["tacsat"]]
         stats_landings <- res[["stats_landings"]] |> rbind(stats_landings)
+        stats_VMS      <- res[["stats_VMS"]] |> rbind(stats_VMS) 
+        
       }
       
       if("ICESrectangle" %in% level){
@@ -256,6 +286,7 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
         eflaloVessel  <- res[["eflalo"]]
         byRectTacsat  <- res[["tacsat"]]
         stats_landings <- res[["stats_landings"]] |> rbind(stats_landings)
+        stats_VMS      <- res[["stats_VMS"]] |> rbind(stats_VMS) 
       }
       if(TRUE){ #-For remainder of vessel merging not at ICESrectangle level
         print("level: year & conserve = T, by vessel")
@@ -270,6 +301,7 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
         eflaloVessel  <- res[["eflalo"]]
         byVessTacsat  <- res[["tacsat"]]
         stats_landings <- res[["stats_landings"]] |> rbind(stats_landings)
+        stats_VMS      <- res[["stats_VMS"]] |> rbind(stats_VMS) 
       }
       
       #-------------------------------------------------------------------------------
@@ -308,6 +340,7 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
         eflaloNoVessel    <- res[["eflalo"]]
         byDayTacsat       <- res[["tacsat"]]
         stats_landings <- res[["stats_landings"]] |> rbind(stats_landings)
+        stats_VMS      <- res[["stats_VMS"]] |> rbind(stats_VMS) 
       }
       
       if("ICESrectangle" %in% level){
@@ -321,11 +354,13 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
         nPings            <- countPings(~icesrectangle,tacsat,by=by)
         
         #- Do the merging of eflalo to tacsat
-        res               <- eflalo2Pings(eflaloNoVessel,tacsat,nPings,c("LE_RECT"),                        eflaloCol[c(kgs,eur)],NULL,by=by)
+        res               <- eflalo2Pings(eflaloNoVessel,tacsat,nPings,c("LE_RECT"),eflaloCol[c(kgs,eur)],NULL,by=by)
         eflaloNoVessel    <- res[["eflalo"]]
         byRectTacsat      <- res[["tacsat"]]
         stats_landings <- res[["stats_landings"]] |> rbind(stats_landings)
+        stats_VMS      <- res[["stats_VMS"]] |> rbind(stats_VMS) 
       }
+      
       if(TRUE){ #-For remainder of merging not at ICESrectangle level
         print("level: year & conserve = T, no vessel match")
         if(!"SI_YEAR" %in% colnames(tacsat))          tacsat$SI_YEAR            <- an(format(tacsat$SI_DATIM,format="%Y"))
@@ -339,6 +374,7 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
         eflaloNoVessel    <- res[["eflalo"]]
         byVessTacsat      <- res[["tacsat"]]
         stats_landings <- res[["stats_landings"]] |> rbind(stats_landings)
+        stats_VMS      <- res[["stats_VMS"]] |> rbind(stats_VMS) 
       }
       #-------------------------------------------------------------------------------
       # 2b-2) Bind all tacsat files with no matching FT_REF or VE_REF
@@ -349,7 +385,9 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
       if("day" %in% level &   "ICESrectangle" %in% level) tacsatREF <- rbind(byDayTacsat,byRectTacsat,byVessTacsat)
       
       tacsatREF[,kgeur(colnames(tacsatREF))]      <- sweep(tacsatREF[,kgeur(colnames(tacsatREF))],1,tacsatREF$pings,"/")
-      tacsatREF$ID                                <- af(ac(tacsatREF$ID.x))
+     
+      
+       tacsatREF$ID                                <- af(ac(tacsatREF$ID.x))
       DT                                          <- data.table(tacsatREF)
       eq1                                         <- c.listquote(paste("sum(",colnames(tacsatREF[,kgeur(colnames(tacsatREF))]),",na.rm=TRUE)",sep=""))
       tacsatREF                                   <- DT[,eval(eq1),by=ID.x]; tacsatREF <- data.frame(tacsatREF); setnames(tacsatREF,colnames(tacsatREF),c("ID",colnames(eflaloVessel[,kgeur(colnames(eflaloVessel))])))
@@ -364,14 +402,17 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
     if(exists("tacsatFTREF")){one   <- tacsatFTREF} else{ one   <- numeric()}
     if(exists("tacsatVEREF")){two   <- tacsatVEREF} else{ two   <- numeric()}
     if(exists("tacsatREF"))  {three <- tacsatREF}   else{ three <- numeric()}
+   
     tacsatTot       <- rbind(one,two,three)
     DT              <- data.table(tacsatTot)
     eq1             <- c.listquote(paste("sum(",colnames(tacsatTot[,kgeur(colnames(tacsatTot))]),",na.rm=TRUE)",sep=""))
     tacsatTot       <- DT[,eval(eq1),by=ID]; tacsatTot <- data.frame(tacsatTot); setnames(tacsatTot,colnames(tacsatTot),c("ID",colnames(eflalo[,kgeur(colnames(eflalo))])))
     tacsatReturn    <- merge(tacsat,tacsatTot,by="ID",all.x=TRUE)
+    
     if(variable == "value") tacsatReturn <- tacsatReturn[,c(1:dim(tacsat)[2],grep("EURO",colnames(tacsatReturn)))]
     if(variable == "kgs")   tacsatReturn <- tacsatReturn[,c(1:dim(tacsat)[2],grep("KG",colnames(tacsatReturn)))]
     if(variable == "all")   tacsatReturn <- tacsatReturn
+  
   } else {
     if(exists("tacsatFTREF")==FALSE){stop("You have selected not to conserve catches, but there is no trip identifier in the tacsat file")}
     tacsatReturn  <- merge(tacsat,tacsatFTREF,by="ID",all.x=TRUE)
@@ -379,10 +420,13 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
     if(variable == "kgs")   tacsatReturn <- tacsatReturn[,c(1:dim(tacsat)[2],grep("KG",colnames(tacsatReturn)))]
     if(variable == "all")   tacsatReturn <- tacsatReturn
   }
+  
   if(returnAll & nrow(remtacsat)>0)
     tacsatReturn <- orderBy(~ID,data=rbindTacsat(tacsatReturn,remtacsat))
   
-  return(list (tacsatEflalo =  orderBy(~ID,data=tacsatReturn)[,-match("ID",colnames(tacsatReturn))], stats_landings =  stats_landings    ) ) 
+  return(list (tacsatEflalo =  orderBy(~ID,data=tacsatReturn)[,-match("ID",colnames(tacsatReturn))],
+               stats_landings =  stats_landings , 
+               stats_VMS      = stats_VMS  ) ) 
          
          }
 
@@ -396,7 +440,10 @@ countPings <- function(formula,tacsat,grid=NULL,by=NULL){
   
   require(sf)
   require(data.table)
-  #Turn selected variabels into element list
+  
+  
+  #1. Turn selected variables  in the formula into element list. OUTPUT: vars
+  
   form <- formula
   if (form[[1]] != "~")
     stop("Error: Formula must be one-sided.")
@@ -406,28 +453,41 @@ countPings <- function(formula,tacsat,grid=NULL,by=NULL){
     formc <- paste("+", formc, sep = "")
   vars <- unlist(strsplit(formc, "[\\+\\-]"))
   vars <- vars[vars != ""]
+  
+  # Get the signs in the formula. but Currently SAP0p77 do not use signs 
   signs <- formc
   
   for (i in 1:length(vars)) {
     signs <- gsub(vars[i], "", signs)
   }
-  signs <- unlist(strsplit(signs, "")) #Currently we do not use signs
   
-  #Define which variables selected are column names, time variables or spatial variables
+  signs <- unlist(strsplit(signs, "")) 
+  
+  #2. Define which variables selected are column names, time variables or spatial variables
+  #INPUT: vars
+  
   Vars      <- vars[which(!vars %in% c("day","week","month","quarter","year","gridcell","icesrectangle","icesarea"))]
   timeVars  <- vars[which(vars %in% c("day","week","month","quarter","year"))]
   spatVars  <- vars[which(vars %in% c("gridcell","icesrectangle","icesarea"))]
   
-  #Add time notation if you want this as output
+  #3. Add to TACSAT the time category passed as function argument in the  formula 
+  ## INPUT: The time  variables in the formula extracted in Step 2. 
+  
   if(length(timeVars)>0){
+    
     if(!length(grep("SI_DATIM",colnames(tacsat)))>0) tacsat$SI_DATIM <- as.POSIXct(paste(tacsat$SI_DATE,  tacsat$SI_TIME,   sep=" "), tz="GMT", format="%d/%m/%Y  %H:%M")
     if("day" %in% timeVars & !"SI_DAY" %in% colnames(tacsat)){       tacsat$SI_DAY   <- an(format(tacsat$SI_DATIM,format="%j"))};      if("day" %in% timeVars){   ; timeVars[which(timeVars=="day")]      <- "SI_DAY"}
     if("week" %in% timeVars & !"SI_WEEK" %in% colnames(tacsat)){      tacsat$SI_WEEK  <- an(format(tacsat$SI_DATIM,format="%W"))};     if("week" %in% timeVars){   ; timeVars[which(timeVars=="week")]     <- "SI_WEEK" }
     if("month" %in% timeVars & !"SI_MONTH" %in% colnames(tacsat)){     tacsat$SI_MONTH <- an(format(tacsat$SI_DATIM,format="%m"))};    if("month" %in% timeVars){   ; timeVars[which(timeVars=="month")]    <- "SI_MONTH"}
     if("quarter" %in% timeVars & !"SI_QUART" %in% colnames(tacsat)){   tacsat$SI_QUART <- an(substr(quarters(tacsat$SI_DATIM),2,2))};  if("quarter" %in% timeVars){ ; timeVars[which(timeVars=="quarter")]  <- "SI_QUART"}
     if("year" %in% timeVars & !"SI_YEAR" %in% colnames(tacsat)){      tacsat$SI_YEAR  <- an(format(tacsat$SI_DATIM,format="%Y"))};     if("year" %in% timeVars){   ; timeVars[which(timeVars=="year")]     <- "SI_YEAR" }
-  }
-  #Add spatial notation if you want this as output
+  
+    }
+  ## OUTPUT: TACSAT with time categories fields
+  
+  #3. Add to TACSAT the Spatial category passed as function argument in the  formula 
+  ## INPUT: The spatial variables in the formula extracted in Step 2.
+  
   if(length(spatVars)>0){
     if("gridcell" %in% spatVars & is.null(grid) == TRUE) stop("Grid needs to be specified to use the 'gridcell' option")
     if("gridcell" %in% spatVars & is.null(grid) == FALSE){
@@ -441,11 +501,17 @@ countPings <- function(formula,tacsat,grid=NULL,by=NULL){
       tacsat$GR_LATI            <- newCoords[,2]
       spatVars[which(spatVars=="gridcell")] <- "GR_LONG"; spatVars <- c(spatVars,"GR_LATI")
     }
+    
+    
+    ### 3.1 Calculates the ICES Rectangle where the VMS record is located
+    ### Important step to match with Logbook ICES rectangle in Match Level 0.a and 0.b
+    
     if("icesrectangle" %in% spatVars){
       if(!"LE_RECT" %in% colnames(tacsat))
         tacsat$LE_RECT <- ICESrectangle(tacsat)
       spatVars[which(spatVars=="icesrectangle")] <- "LE_RECT"
     }
+    
     if("icesarea" %in% spatVars){
       if(!"LE_AREA" %in% colnames(tacsat))
         tacsat$LE_AREA <- ICESarea(tacsat)
@@ -453,22 +519,48 @@ countPings <- function(formula,tacsat,grid=NULL,by=NULL){
     }
   }
   
+  ## OUTPUT: TACSAT with SPATIAL categories fields
+  
+  #4. Sum the number of VMS pings ( if BY is NULL) or the variable in BY ( eg. sum INTV as number of hours ) 
+  ## INPUT: TACSAT
+  
+  
   if(is.null(by)){
     tacsat$SUM      <- 1
+    tacsat$n_vms_records      <- 1
+    
   } else {
-    tacsat$SUM      <- tacsat[,by]
+    tacsat$SUM                <- tacsat[,by]
+    tacsat$n_vms_records      <- 1  ## keep track to number of records
   }
   
+  ## OUTPUT: TACSAT with the SUM field with value of 1 ( if BY is NULL) or with BY variable ( e.g. INTV value if choosen in BY)
   
-  totVars         <- c(Vars,timeVars,spatVars)
   
-  #Do the counting of pings
-  for(iVars in 1:length(totVars)) tacsat[,totVars[iVars]] <- af(ac(tacsat[,totVars[iVars]]))
-  DT              <- data.table(tacsat)
-  eq              <- c.listquote(totVars)
   
-  res             <- DT[,sum(SUM),by=eval(eq)]
-  setnames(res,colnames(res),c(totVars,"pings"))
+  #5. Sum the number of VMS pings ( if BY is NULL) or the variable in BY ( eg. sum INTV as number of hours ) 
+  
+      ## Convert all variables into FACTOR prior the SUM of step 4 create values 
+  
+      totVars         <- c(Vars,timeVars,spatVars)
+      for(iVars in 1:length(totVars)) tacsat[,totVars[iVars]] <- af(ac(tacsat[,totVars[iVars]]))
+      
+      
+      ## Prepare the TACSAT as Data Table  and the variable as a quoted list to use in the GROUP BY DT function  
+      
+      DT              <- data.table(tacsat)
+      eq              <- c.listquote(totVars)
+      
+  
+      # 5.1 Sum the values added in Step 4 in the SUM column by the GROUP BY categories ( eq = totVars  as quoted list) 
+  
+      res             <- DT[,sum(SUM),by=eval(eq)]
+      
+      ## Change the total sum field name to "pings" name . 
+      ## This is passed in eflal2pings functions and used in 
+      
+      setnames(res,colnames(res),c(totVars,"pings"))
+      
   #colnames(res)   <- c(totVars,"pings")
   
   return(data.frame(res))
@@ -500,48 +592,140 @@ countPings <- function(formula,tacsat,grid=NULL,by=NULL){
 #' \code{\link{mergeEflalo2Pings}}
 #' @references EU Lot 2 project
 #' @export eflalo2Pings
+
+
 eflalo2Pings <- function(eflalo,tacsat,pings,vars,eflaloCol,remainTacsat,by=NULL){
-  #- Merge landings and values to get unique eflalo set given 'totVars'
-  for(iVars in 1:length(vars)){
-    eflalo[,vars[iVars]] <- af(ac(eflalo[,vars[iVars]]))
-    tacsat[,vars[iVars]] <- af(ac(tacsat[,vars[iVars]]))
-  }
   
-  DT                    <- data.table(eflalo)
-  eq1                   <- c.listquote(paste("sum(",colnames(eflalo[,kgeur(colnames(eflalo))]),",na.rm=TRUE)",sep=""))
-  eq2                   <- c.listquote(vars)
+  ## INPUT : EFLALO and TACSAT datasets
+  ## pings argumetn is passed the output  of countPings function 
+  ## vars is the list of variables for this Match Level  ( e.g. FT_REF, ICESRect, SI_DAY)
+  ## efaloCol  are the columns with  LE_KG and LE_EURO
+  ## remainTacsat  , the unique ID's of the TACSAT records that were not matched at each step . 
+  ## BY , the variabel to be used to weight the landings distribution
   
-  eflalo            <- data.frame(DT[,eval(eq1),by=eval(eq2)]); colnames(eflalo) <- c(vars,eflaloCol)
-  eflalo$ID         <- 1:nrow(eflalo)
+  ######################################################################
+  #1.  SUM the LE_KG and LE_EURO columns by GROUP BY 'vars' 
+  #####################################################################
   
-  #- Merge eflalo to pings to get number of pings per eflalo record
+        # Convert the variables in EFLALO and TACSAT in factors
+  
+        for(iVars in 1:length(vars)){
+          eflalo[,vars[iVars]] <- af(ac(eflalo[,vars[iVars]]))
+          tacsat[,vars[iVars]] <- af(ac(tacsat[,vars[iVars]]))
+        }
+  
+        # Prepare the EFLALO data as Data Table  
+        DT                    <- data.table(eflalo)
+        ## Create the formula to SUM the  LE_KG , LE_EURO  variables and been evaluated in Data Table 
+        eq1                   <- c.listquote(paste("sum(",colnames(eflalo[,kgeur(colnames(eflalo))]),",na.rm=TRUE)",sep=""))
+        #Converted to quoted list  the variables for GROUP BY ( vars_ )
+        eq2                   <- c.listquote(vars)
+  
+  # Sum using  Data Table  the LE_KG, LE_EURO vars by GROUP BY variables 
+  # OUTPUT: Replace the EFLALO variable 
+  eflalo            <- data.frame(DT[,eval(eq1),by=eval(eq2)]); 
+     
+       #Change the names of the resulted  EFLALO data frame according to variables names and LE_KG and LE_EURO variables 
+        colnames(eflalo) <- c(vars,eflaloCol)
+       # Create and ID for the records in the summarised EFLALO version 
+        eflalo$ID         <- 1:nrow(eflalo)
+        
+  
+  ########################################################################
+  #2.  Merge summarised EFLALO to TACSAT pings to distribute the landings in the LB  by VMS record
+  ########################################################################
+        
+        
+  ## 2.1 JOIN the summarised EFLALO with the summarised TACSAT ( 'pings'  output  in countPings function ) 
+  ## This will give the total number of VMS records or hours ( if By is used with INTV) by GROUP of variables 
   byPing             <- merge(eflalo,data.frame(pings),by=vars,all=FALSE)
+        
+  ## 2.2 JOIN the JOINED   data in step 2.1 to the original TACSAT data 
+  ## This will give the total number of VMS records or hours and the total number of landings weight and vlaue in LE_KG and LE_EURO
   byTacsat           <- merge(tacsat,byPing,by=vars,all=FALSE)
    
+  ########################################################################
+  #3.  Divide each VMS record INTV by the total SUMMED by GROUP BY attributes in countPIngs function section 5.1
+  ########################################################################
+  
   if(is.null(by)==FALSE)
     byTacsat$pings   <- byTacsat$pings / byTacsat[,by]
-   
+  
+  ########################################################################
+  #3.  Create the statistics of landings distributed at each match level process
+  ########################################################################
+  
+  ## Create the data frame to track stats
   stats_landings = data.frame ( match_level = paste(vars, collapse = ',') , category = c( "kg in eflalo", "kg in merged tacsat" ,"kg removed from eflalo" ), total = 0 )
+  stats_VMS = data.frame ( match_level = paste(vars, collapse = ',') , category = c( "total VMS records in TACSAT", "number of VMS records", "avg number of records by Match Level vars"  ), total = 0 )
   
-  
+  # Calculate the total sum of ladings that were in EFLALO
   stats_landings[1,'total' ] = round(sum(byPing [,kgeur(colnames(byPing))[1]]))
   try(print(  paste("kg in eflalo",   stats_landings[1,'total' ]   ) ))
  
+  # Calculate the total sum of ladings that were matched with PINGS 
   stats_landings[2,'total' ] = round(sum(sweep(byTacsat[,kgeur(colnames(byTacsat))][1],1,byTacsat$pings,"/")))
   try(print(paste("kg in merged tacsat", stats_landings[2,'total' ]  )))
-  #?sweep
-  #- Bookkeeping which tacsat ID's have been merged and which have not yet been merged
+   
+  # Calculate the total sum of VMS records  that were matched at this Match LEvel  
+  
+  
+  stats_VMS[1,'total' ] = dim(tacsat)[1]
+  
+  try(print(paste("Total VMS records", stats_VMS[1,'total' ]  )))
+  
+  if ( dim( byTacsat)[1] > 0  ) { 
+    byTacsat$n_records = 1 
+     stats_VMS[2,'total' ] = round(sum( byTacsat$n_records )) 
+  
+  
+ 
+  
+  byTacsatDT = data.table(byTacsat)
+  mean_n_records_group = byTacsatDT[,sum(n_records),by=eval(eq2)]; 
+  setnames(mean_n_records_group,colnames(mean_n_records_group),c(vars,"total_by_groups"))
+  stats_VMS[3,'total' ] = round(mean( mean_n_records_group$total_by_groups ))
+  
+  } else {
+    stats_VMS[2,'total' ] = 0
+    stats_VMS[3,'total' ] = 0
+  }
+  
+  try(print(paste("VMS records matched", stats_VMS[2,'total' ]  )))
+  try(print(paste("VMS records matched",round( (  stats_VMS[2,'total' ]/  stats_VMS[1,'total' ]) , 2)*100, '%'  )))
+  
+  
+  
+    
+  #- Bookkeeping which TACSAT ID's have been merged and which have not yet been merged
   remainTacsat          <- remainTacsat[which(!remainTacsat %in% byTacsat$ID.x)]
   
-  #- Bookkeeping which eflalo catches have been merged and which have not yet been merged
+  #- Bookkeeping which EFLALO  catches have been merged and which have not yet been merged
   idx                   <- sort(unique(byPing$ID))
   
+  # Calculate the total sum of ladings in EFLALO that are going to be removed 
   stats_landings[3,'total' ] = round(sum(eflalo[idx,kgeur(colnames(eflalo))[1]]))
   
   try(print(paste("kg removed from eflalo",stats_landings[3,'total' ]  )))
+  
+  ########################################################################
+  #4.  Change to 0 all EFLALO landings records already distributed
+  ########################################################################
+  
   eflalo[idx,kgeur(colnames(eflalo))]   <- 0
   
-  return(list(eflalo=eflalo,tacsat=byTacsat,remainTacsat=remainTacsat, stats_landings = stats_landings))}
+  ########################################################################
+  # Return the list of datasets
+  ########################################################################
+  
+  return(list(eflalo=eflalo,  ## eflalo modified with removed landings already matched
+              tacsat=byTacsat,   #### TACSAT with TOTAL LE_KG and LE_EURO and the 'ping' field that contains the proportion weigth of each record from teh total by GROUP BY variuables
+              remainTacsat=remainTacsat,   ##ID's of remaining TACSAT records not matched 
+              stats_landings = stats_landings, 
+              stats_VMS = stats_VMS ) ## stats dataset to track landings distributions
+         )
+  
+  }
 
 
 
