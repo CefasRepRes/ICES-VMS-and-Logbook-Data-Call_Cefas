@@ -69,7 +69,24 @@
 
 
 
-splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conserve=TRUE,by=NULL,returnAll=F){
+splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conserve =TRUE, conserve_ML2 = TRUE ,by=NULL,returnAll=F){
+  
+  
+  # tacsat = tacsatp |>  filter  ( VE_REF== 'A13171' & SI_FT == '900068325688' )
+  # eflalo = eflaloM |>  filter ( FT_REF == '900068325688')
+  # 
+  # 
+  # library(sf)
+  # tacsatTrip |>  arrange(SI_DATIM) |> 
+  #   st_as_sf( coords = c("SI_LONG", "SI_LATI"), crs = 4326, remove = F) |> 
+  #  
+  #   #st_combine() %>% 
+  #   # group_by(ID) |> 
+  #   # summarize(do_union=FALSE) |>   # do_union=FALSE doesn't work as well
+  #   # st_cast("LINESTRING") |> print()
+  # ggplot() + geom_sf(aes( color = as.factor(ID) ))  +                            # Plot points
+  #   geom_text(aes(x= SI_LONG, y = SI_LATI,label = ID), vjust = 1)  +
+  #   geom_line(aes( x= SI_LONG, y = SI_LATI))
   
   require(data.table)
   require(lubridate)
@@ -97,6 +114,7 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
   }
   
   #- Levels have hierachy, and need to be suplemented with lower levels
+  
   if(length(which(!level %in% c("day","ICESrectangle","trip")))>0)
     stop(level[which(!level %in% c("day","ICESrectangle","trip"))])
   
@@ -135,7 +153,9 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
   if(dim(tacsatTrip)[1]>0 & dim(eflaloTrip)[1] >0){
     
     if("day" %in% level){
-      print("level: day")
+      
+      print("Match Level 0.a : Vessel + Fishing Trip + ICES Rect + Day")
+      
       if(!"SI_YEAR" %in% colnames(tacsatTrip))  tacsatTrip$SI_YEAR    <- an(format(tacsatTrip$SI_DATIM,format="%Y"))
       if(!"SI_DAY" %in%  colnames(tacsatTrip))  tacsatTrip$SI_DAY     <- an(format(tacsatTrip$SI_DATIM,format="%j"))
       if(!"LE_RECT" %in% colnames(tacsatTrip))  tacsatTrip$LE_RECT    <- ICESrectangle(tacsatTrip)
@@ -154,16 +174,22 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
       
       eflaloTrip    <- res[["eflalo"]]
       byDayTacsat   <- res[["tacsat"]]
+      byDayTacsat = byDayTacsat |> mutate (match_level = "VE_REF,FT_REF,LE_RECT,SI_DAY")
+      
       remainTacsat  <- res[["remainTacsat"]]
       stats_landings <- res[["stats_landings"]] 
       stats_VMS      <- res[["stats_VMS"]] 
+      
+      
+    
       
       
     }
     
     if("ICESrectangle" %in% level){
       
-      print("level: rectangle")
+      print("Match Level 0.b : Vessel + Fishing Trip + ICES Rect")
+      
       if(!"SI_YEAR" %in% colnames(tacsatTrip))  tacsatTrip$SI_YEAR    <- an(format(tacsatTrip$SI_DATIM,format="%Y"))
       if(!"LE_RECT" %in% colnames(tacsatTrip))  tacsatTrip$LE_RECT    <- ICESrectangle(tacsatTrip)
       
@@ -179,6 +205,8 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
       
       eflaloTrip    <- res[["eflalo"]]      ## EFLALO modified with the landings distributed removed
       byRectTacsat  <- res[["tacsat"]]      ## The TACSAT with the calculated toal landings by GRPOUP and weight of each point
+      byRectTacsat = byRectTacsat |> mutate (match_level = "VE_REF,FT_REF,LE_RECT") ## track teh levels of match 
+      
       remainTacsat  <- res[["remainTacsat"]]   ## Remaining ID's of the TACSAT that have not been matched 
       stats_landings <- res[["stats_landings"]] |> rbind(stats_landings) ### Stats of distributed landings
       stats_VMS      <- res[["stats_VMS"]] |> rbind(stats_VMS) 
@@ -188,7 +216,7 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
     
     if("trip" %in% level){
       
-      print("level: trip")
+      print("Match Level 0.c : Vessel + Fishing Trip")
       if(!"SI_YEAR" %in% colnames(tacsatTrip))  tacsatTrip$SI_YEAR    <- an(format(tacsatTrip$SI_DATIM,format="%Y"))
       if(!"SI_YEAR" %in% colnames(eflaloTrip))  eflaloTrip$SI_YEAR    <- an(format(eflaloTrip$LE_CDATIM,format="%Y"))
       
@@ -200,6 +228,8 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
      
       eflaloTrip    <- res[["eflalo"]]
       byTripTacsat  <- res[["tacsat"]]
+      byTripTacsat = byTripTacsat |> mutate (match_level = "VE_REF,FT_REF")
+      
       remainTacsat  <- res[["remainTacsat"]]
       stats_landings <- res[["stats_landings"]] |> rbind(stats_landings)
       stats_VMS      <- res[["stats_VMS"]] |> rbind(stats_VMS) 
@@ -230,10 +260,16 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
     
     tacsatFTREF[,kgeur(colnames(tacsatFTREF))]    <- sweep(tacsatFTREF[,kgeur(colnames(tacsatFTREF))],1,tacsatFTREF$pings,"/")
     
-    tacsatFTREF$ID                                <- af(ac(tacsatFTREF$ID.x))
+    tacsatFTREF
+    
+    #tacsatFTREF$ID                                <- tacsatFTREF$ID.x # af(ac(tacsatFTREF$ID.x))
     DT                                            <- data.table(tacsatFTREF)
     eq1                                           <- c.listquote(paste("sum(",colnames(tacsatFTREF[,kgeur(colnames(tacsatFTREF))]),",na.rm=TRUE)",sep=""))
-    tacsatFTREF                                   <- DT[,eval(eq1),by=ID.x]; tacsatFTREF <- data.frame(tacsatFTREF); setnames(tacsatFTREF,colnames(tacsatFTREF),c("ID",colnames(eflaloTrip[,kgeur(colnames(eflaloTrip))])))
+    tacsatFTREF                                   <- DT[,eval(eq1),by=.(ID.x, match_level)]; tacsatFTREF <- data.frame(tacsatFTREF); setnames(tacsatFTREF,colnames(tacsatFTREF),c("ID","match_level",colnames(eflaloTrip[,kgeur(colnames(eflaloTrip))])))
+   
+     
+   
+   
   }
   
   #-------------------------------------------------------------------------------
@@ -251,7 +287,9 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
       #-------------------------------------------------------------------------------
       
       if("day" %in% level){
-        print("level: day & conserve = T, by vessel")
+        
+        print("CONSERVE Match Level 1.a : Vessel + Day")
+       
         if(!"SI_YEAR" %in% colnames(tacsat))  tacsat$SI_YEAR                <- an(format(tacsat$SI_DATIM,format="%Y"))
         if(!"SI_DAY" %in%  colnames(tacsat))  tacsat$SI_DAY                 <- an(format(tacsat$SI_DATIM,format="%j"))
         if(!"LE_RECT" %in% colnames(tacsat))  tacsat$LE_RECT                <- ICESrectangle(tacsat)
@@ -266,13 +304,17 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
         res           <- eflalo2Pings(eflaloVessel,tacsat,nPings,c("VE_REF","LE_RECT","SI_DAY"),      eflaloCol[c(kgs,eur)],NULL,by=by)
         eflaloVessel  <- res[["eflalo"]]
         byDayTacsat   <- res[["tacsat"]]
+        byDayTacsat = byDayTacsat |> mutate (match_level = "VE_REF,LE_RECT,SI_DAY")
+        
         stats_landings <- res[["stats_landings"]] |> rbind(stats_landings)
         stats_VMS      <- res[["stats_VMS"]] |> rbind(stats_VMS) 
+        
         
       }
       
       if("ICESrectangle" %in% level){
-        print("level: rectangle & conserve = T, by vessel")
+        print("CONSERVE Match Level 1.b : Vessel + ICES Rectangle")
+        
         if(!"SI_YEAR" %in% colnames(tacsat))  tacsat$SI_YEAR                <- an(format(tacsat$SI_DATIM,format="%Y"))
         if(!"LE_RECT" %in% colnames(tacsat))  tacsat$LE_RECT                <- ICESrectangle(tacsat)
         
@@ -285,13 +327,18 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
         res           <- eflalo2Pings(eflaloVessel,tacsat,nPings,c("VE_REF","LE_RECT"),               eflaloCol[c(kgs,eur)],NULL,by=by)
         eflaloVessel  <- res[["eflalo"]]
         byRectTacsat  <- res[["tacsat"]]
+        byRectTacsat = byRectTacsat |> mutate (match_level = "VE_REF,LE_RECT")
+        
         stats_landings <- res[["stats_landings"]] |> rbind(stats_landings)
         stats_VMS      <- res[["stats_VMS"]] |> rbind(stats_VMS) 
       }
       if(TRUE){ #-For remainder of vessel merging not at ICESrectangle level
-        print("level: year & conserve = T, by vessel")
+        
+        print("CONSERVE Match Level 1.c : Vessel + Year")
+        
         if(!"SI_YEAR" %in% colnames(tacsat))              tacsat$SI_YEAR    <- an(format(tacsat$SI_DATIM,format="%Y"))
         if(!"SI_YEAR" %in% colnames(eflaloVessel))  eflaloVessel$SI_YEAR    <- an(format(eflaloVessel$LE_CDATIM,format="%Y"))
+        
         
         #- Count pings in tacsat set
         nPings                <- countPings(~VE_REF,tacsat,by=by)
@@ -300,6 +347,8 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
         res           <- eflalo2Pings(eflaloVessel,tacsat,nPings,c("VE_REF" ),               eflaloCol[c(kgs,eur)],NULL,by=by)
         eflaloVessel  <- res[["eflalo"]]
         byVessTacsat  <- res[["tacsat"]]
+        byVessTacsat = byVessTacsat |> mutate (match_level = "VE_REF")
+        
         stats_landings <- res[["stats_landings"]] |> rbind(stats_landings)
         stats_VMS      <- res[["stats_VMS"]] |> rbind(stats_VMS) 
       }
@@ -313,18 +362,23 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
       if("day" %in% level &   "ICESrectangle" %in% level) tacsatVEREF <- rbind(byDayTacsat,byRectTacsat,byVessTacsat)
       
       tacsatVEREF[,kgeur(colnames(tacsatVEREF))]    <- sweep(tacsatVEREF[,kgeur(colnames(tacsatVEREF))],1,tacsatVEREF$pings,"/")
-      tacsatVEREF$ID                                <- af(ac(tacsatVEREF$ID.x))
+      #tacsatVEREF$ID                                <- af(ac(tacsatVEREF$ID.x))
       DT                                            <- data.table(tacsatVEREF)
       eq1                                           <- c.listquote(paste("sum(",colnames(tacsatVEREF[,kgeur(colnames(tacsatVEREF))]),",na.rm=TRUE)",sep=""))
-      tacsatVEREF                                   <- DT[,eval(eq1),by=ID.x]; tacsatVEREF <- data.frame(tacsatVEREF); setnames(tacsatVEREF,colnames(tacsatVEREF),c("ID",colnames(eflaloVessel[,kgeur(colnames(eflaloVessel))])))
-    }
+      tacsatVEREF                                   <- DT[,eval(eq1), by=.(ID.x, match_level)]; tacsatVEREF <- data.frame(tacsatVEREF); setnames(tacsatVEREF,colnames(tacsatVEREF),c("ID","match_level",colnames(eflaloVessel[,kgeur(colnames(eflaloVessel))])))
+       
+      
+      }
     
-    if(dim(tacsat)[1] > 0 & dim(eflaloNoVessel)[1] > 0){
+    if(dim(tacsat)[1] > 0 & dim(eflaloNoVessel)[1] > 0 & conserve_ML2 == TRUE){
+      
       #-------------------------------------------------------------------------------
       # 2a-2) Merge eflalo to tacsat with no matching FT_REF or VE_REF
       #-------------------------------------------------------------------------------
       if("day" %in% level){
-        print("level: day & conserve = T, no vessel match")
+        
+        print("CONSERVE Match Level 2.a : Day")
+        
         if(!"SI_YEAR" %in% colnames(tacsat))  tacsat$SI_YEAR                    <- an(format(tacsat$SI_DATIM,format="%Y"))
         if(!"SI_DAY" %in%  colnames(tacsat))  tacsat$SI_DAY                     <- an(format(tacsat$SI_DATIM,format="%j"))
         if(!"LE_RECT" %in% colnames(tacsat))  tacsat$LE_RECT                    <- ICESrectangle(tacsat)
@@ -339,12 +393,17 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
         res               <- eflalo2Pings(eflaloNoVessel,tacsat,nPings,c("LE_RECT","SI_DAY"),               eflaloCol[c(kgs,eur)],NULL,by=by)
         eflaloNoVessel    <- res[["eflalo"]]
         byDayTacsat       <- res[["tacsat"]]
+        byDayTacsat = byDayTacsat |> mutate (match_level = "LE_RECT,SI_DAY")
+        
+        
         stats_landings <- res[["stats_landings"]] |> rbind(stats_landings)
         stats_VMS      <- res[["stats_VMS"]] |> rbind(stats_VMS) 
       }
       
       if("ICESrectangle" %in% level){
-        print("level: rectangle & conserve = T, no vessel match")
+        
+        print("CONSERVE Match Level 2.b : ICES Rectangle")
+        
         if(!"SI_YEAR" %in% colnames(tacsat))  tacsat$SI_YEAR    <- an(format(tacsat$SI_DATIM,format="%Y"))
         if(!"LE_RECT" %in% colnames(tacsat))  tacsat$LE_RECT    <- ICESrectangle(tacsat)
         
@@ -357,12 +416,17 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
         res               <- eflalo2Pings(eflaloNoVessel,tacsat,nPings,c("LE_RECT"),eflaloCol[c(kgs,eur)],NULL,by=by)
         eflaloNoVessel    <- res[["eflalo"]]
         byRectTacsat      <- res[["tacsat"]]
+        byRectTacsat = byRectTacsat |> mutate (match_level = "LE_RECT")
+        
+        
         stats_landings <- res[["stats_landings"]] |> rbind(stats_landings)
         stats_VMS      <- res[["stats_VMS"]] |> rbind(stats_VMS) 
       }
       
       if(TRUE){ #-For remainder of merging not at ICESrectangle level
-        print("level: year & conserve = T, no vessel match")
+        
+        print("CONSERVE Match Level 2.b : Year")
+        
         if(!"SI_YEAR" %in% colnames(tacsat))          tacsat$SI_YEAR            <- an(format(tacsat$SI_DATIM,format="%Y"))
         if(!"SI_YEAR" %in% colnames(eflaloNoVessel))  eflaloNoVessel$SI_YEAR    <- an(format(eflaloNoVessel$LE_CDATIM,format="%Y"))
         
@@ -373,6 +437,8 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
         res               <- eflalo2Pings(eflaloNoVessel,tacsat,nPings,c("SI_YEAR"),                        eflaloCol[c(kgs,eur)],NULL,by=by)
         eflaloNoVessel    <- res[["eflalo"]]
         byVessTacsat      <- res[["tacsat"]]
+        byVessTacsat = byVessTacsat |> mutate (match_level = "YEAR")
+        
         stats_landings <- res[["stats_landings"]] |> rbind(stats_landings)
         stats_VMS      <- res[["stats_VMS"]] |> rbind(stats_VMS) 
       }
@@ -387,35 +453,60 @@ splitAmongPings_0p77 <- function(tacsat,eflalo,variable="all",level="day",conser
       tacsatREF[,kgeur(colnames(tacsatREF))]      <- sweep(tacsatREF[,kgeur(colnames(tacsatREF))],1,tacsatREF$pings,"/")
      
       
-       tacsatREF$ID                                <- af(ac(tacsatREF$ID.x))
+      #tacsatREF$ID                                <- af(ac(tacsatREF$ID.x))
       DT                                          <- data.table(tacsatREF)
       eq1                                         <- c.listquote(paste("sum(",colnames(tacsatREF[,kgeur(colnames(tacsatREF))]),",na.rm=TRUE)",sep=""))
-      tacsatREF                                   <- DT[,eval(eq1),by=ID.x]; tacsatREF <- data.frame(tacsatREF); setnames(tacsatREF,colnames(tacsatREF),c("ID",colnames(eflaloVessel[,kgeur(colnames(eflaloVessel))])))
-    }
+      tacsatREF                                   <- DT[,eval(eq1), by=.(ID.x, match_level)]; tacsatREF <- data.frame(tacsatREF); setnames(tacsatREF,colnames(tacsatREF),c("ID","match_level", colnames(eflaloVessel[,kgeur(colnames(eflaloVessel))])))
+       
+      
+      }
   }#End conserve
   
   #-------------------------------------------------------------------------------
   # 3) Merge all tacsat files together and return
   #-------------------------------------------------------------------------------
   
-  if(conserve==TRUE){
-    if(exists("tacsatFTREF")){one   <- tacsatFTREF} else{ one   <- numeric()}
-    if(exists("tacsatVEREF")){two   <- tacsatVEREF} else{ two   <- numeric()}
-    if(exists("tacsatREF"))  {three <- tacsatREF}   else{ three <- numeric()}
+  if(conserve == TRUE){
+    
+    
+    
+    ## create a table for the 3 cases 
+    if(exists("tacsatFTREF")){one   <- tacsatFTREF  }   else  { one   <- numeric() }
+    if(exists("tacsatVEREF")){two   <- tacsatVEREF  }   else  { two   <- numeric() }
+    if(exists("tacsatREF"))  {three <- tacsatREF    }   else  { three <- numeric() }
+    
+  
+    
+    ##bin together the 3 tables ( trip, vessel  , no vessel /trip)
    
     tacsatTot       <- rbind(one,two,three)
     DT              <- data.table(tacsatTot)
     eq1             <- c.listquote(paste("sum(",colnames(tacsatTot[,kgeur(colnames(tacsatTot))]),",na.rm=TRUE)",sep=""))
-    tacsatTot       <- DT[,eval(eq1),by=ID]; tacsatTot <- data.frame(tacsatTot); setnames(tacsatTot,colnames(tacsatTot),c("ID",colnames(eflalo[,kgeur(colnames(eflalo))])))
-    tacsatReturn    <- merge(tacsat,tacsatTot,by="ID",all.x=TRUE)
+    tacsatTot       <- DT[,eval(eq1),by=.(ID )]; tacsatTot <- data.frame(tacsatTot); setnames(tacsatTot,colnames(tacsatTot),c("ID" ,colnames(eflalo[,kgeur(colnames(eflalo))])))
+    
+    tacsatTot_match_levels = DT[, total := sum(LE_KG_TOT ), by =  .(ID )][, proportion := ifelse (total > 0, round(LE_KG_TOT / total,5), 0 )  ][, match_level_prop := paste0(match_level,"(",proportion,")")  ][, .(Match_level_proportion = paste(match_level_prop, collapse = ";")), by = .(ID)];
+    
+    tacsatReturn1    <- merge(tacsat,tacsatTot,by="ID",all.x=TRUE) ## Merge the original TACSAT with the results of LE_KG, LE_EURO columsn aportioned
+    tacsatReturn    <- merge(tacsatReturn1,tacsatTot_match_levels,by="ID",all.x=TRUE)
+    
     
     if(variable == "value") tacsatReturn <- tacsatReturn[,c(1:dim(tacsat)[2],grep("EURO",colnames(tacsatReturn)))]
     if(variable == "kgs")   tacsatReturn <- tacsatReturn[,c(1:dim(tacsat)[2],grep("KG",colnames(tacsatReturn)))]
     if(variable == "all")   tacsatReturn <- tacsatReturn
   
   } else {
+    
     if(exists("tacsatFTREF")==FALSE){stop("You have selected not to conserve catches, but there is no trip identifier in the tacsat file")}
+    
+    DT              <- data.table(tacsatFTREF)
+    
+    tacsatTot       <- DT[,eval(eq1),by=.(ID)]; tacsatTot <- data.frame(tacsatTot); setnames(tacsatTot,colnames(tacsatTot),c("ID",colnames(eflalo[,kgeur(colnames(eflalo))])))
+    
+    tacsatTot_match_levels = DT[, total := sum(LE_KG_TOT ), by =  .(ID )][, proportion := ifelse (total>0, round(LE_KG_TOT / total,2), 0 )  ][, match_level_prop := paste0(match_level,"(",proportion,")")  ][, .(Match_level_proportion = paste(match_level_prop, collapse = ";")), by = .(ID)];
+    
     tacsatReturn  <- merge(tacsat,tacsatFTREF,by="ID",all.x=TRUE)
+    
+    
     if(variable == "value") tacsatReturn <- tacsatReturn[,c(1:dim(tacsat)[2],grep("EURO",colnames(tacsatReturn)))]
     if(variable == "kgs")   tacsatReturn <- tacsatReturn[,c(1:dim(tacsat)[2],grep("KG",colnames(tacsatReturn)))]
     if(variable == "all")   tacsatReturn <- tacsatReturn

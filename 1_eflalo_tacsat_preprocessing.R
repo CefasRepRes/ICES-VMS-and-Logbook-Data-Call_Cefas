@@ -273,17 +273,7 @@ for(year in yearsToSubmit){
   
   
   
-  # 1.3.7.2 Remove overlapping trips.    Landing date previous of Departure date next trip  
-  
-  
-  
-  # 1.3.7.3 Remove overlapping trips.    Landing date previous of Departure date next trip  
-  
-  
-  # 1.3.7.4 Remove overlapping trips.    Landing date previous of Departure date next trip  
-  
-  eflalo_bk <- eflalo ; #  eflalo_bk -> eflalo
-  
+
   
   
   

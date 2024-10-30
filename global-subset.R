@@ -477,6 +477,16 @@ splitAmongPings2 <- function(tacsatp, eflalo) {
   
   
   
+  vms_match  = dim( ts1 )[1]
+  
+ vms_total =  dim(t)[1]
+ 
+  
+ # stats_landings_level0a[2,'total' ] = round( vms_match )
+  try(print(paste("vms  in merged tacsat", vms_match   )))
+  try(print(paste("vms  in merged tacsat % from total ", round( (vms_match /vms_total  ) , 2) * 100  , '%'  )))
+  
+  
   ##############################################
   ###### 2. Merge by Match Level 0.b)   FT_REF, LE_MET 
   ##############################################
@@ -526,6 +536,14 @@ splitAmongPings2 <- function(tacsatp, eflalo) {
   
   stats_landings_level0b[2,'total' ] = round(sum(as.data.frame(ts2) [,kg_euro[1]]))
   try(print(paste("kg in merged tacsat", stats_landings_level0b[2,'total' ]  )))
+  
+  
+  vms_match  = dim( ts2 )[1]
+  vms_total =  dim(t)[1]
+  
+  # stats_landings_level0a[2,'total' ] = round( vms_match )
+  try(print(paste("vms  in merged tacsat", vms_match   )))
+  try(print(paste("vms  in merged tacsat % from total ", round( (vms_match /vms_total  ) , 2) * 100  , '%'  )))
   
   
   
@@ -578,6 +596,14 @@ splitAmongPings2 <- function(tacsatp, eflalo) {
   stats_landings_level0c[2,'total' ] = round(sum(as.data.frame(ts3) [,kg_euro[1]]))
   try(print(paste("kg in merged tacsat", stats_landings_level0c[2,'total' ]  )))
   
+  
+  vms_match  = dim( ts3 )[1]
+  vms_total =  dim(t)[1]
+  
+  # stats_landings_level0a[2,'total' ] = round( vms_match )
+  try(print(paste("vms  in merged tacsat", vms_match   )))
+  try(print(paste("vms  in merged tacsat % from total ", round( (vms_match /vms_total  ) , 2) * 100  , '%'  )))
+  
   ##############################################
   ###### 4. Combines the results of Match Level 0 a) , b) and c ) 
   ##############################################
@@ -613,6 +639,7 @@ splitAmongPings2 <- function(tacsatp, eflalo) {
 
 ## Define a function to identify peaks in speed distributions
 callNumberPeak <- function(){
+  
   tt <- tktoplevel()
   peaks <- tclVar(5)
   
@@ -626,7 +653,6 @@ callNumberPeak <- function(){
   
   tkwait.window(tt)
   return(as.numeric(tclvalue(peaks)))}
-
 
 
 

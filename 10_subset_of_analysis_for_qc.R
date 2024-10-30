@@ -5,6 +5,7 @@
 #
 #'------------------------------------------------------------------------------
 library(dplyr)
+library(vmstools)
 
 setwd("C:/Users/MD09/OneDrive - CEFAS/projects/datacalls/ices/2024")
 
@@ -60,15 +61,7 @@ for(year in yearsToSubmit){
   tacsat_ICES_rect_not_coincidence = tacsatprects |>  filter ( LE_RECT != LE_RECT_VMS) |>  dim ( )
   #VMS RECT != LOGBOOK RECT : 645448      
   
-  tacsat_eflalo_ICES_R_report =  data.frame(ref = c ("VMS records with LB coincidence ICES R.", "VMS records with LB not coincidence ICES R."), 
-                                            records = c( tacsat_ICES_rect_coincidence[1], tacsat_ICES_rect_not_coincidence[1])) |> 
-    add_row(ref = "propotion of coincidence / total" ,  records =  round (( tacsat_ICES_rect_coincidence[1] / ( tacsat_ICES_rect_not_coincidence[1] + tacsat_ICES_rect_coincidence[1])  ), 2)   * 100    )
-  
-  
-  save(
-    tacsat_eflalo_ICES_R_report,
-    file = file.path(outPath, paste0("qc1_tacsat_eflalo_ICES_R_report", year, ".RData"))
-  )
+
   
   print(paste0("finish QC1 for", year))
   
@@ -89,7 +82,7 @@ for(year in yearsToSubmit){
   join_q = join_by(LE_L5MET, between ( SI_SP, min, max) )
   tacsatp = tacsatp |>  left_join( fishing_speed_met5_array  , by = join_q )
   
-  tacsatp = tacsatp |>  mutate ( SI_STATE = ifelse ( is.na (min) & is.na (max) , 's', 'f')) |>  select( -colnames (speedarr_met5 ))
+  tacsatp = tacsatp |>  mutate ( SI_STATE = ifelse ( is.na (min) & is.na (max) , 's', 'f')) |>  dplyr::select( -colnames (fishing_speed_met5_array ))
   
   
   
@@ -110,7 +103,51 @@ for(year in yearsToSubmit){
   
   print(paste0("finish QC2 for", year))
   
+  
+  
+  ##############################################################################
+  #### QC 1.1  Get teh ICES rectangles coincidence after select only fishing ##############
+  
+  tacsatp_fishing  = tacsatp |>  filter( SI_STATE == 'f' )
+  tacsatp_fishing$LE_RECT_VMS =  ICESrectangle(dF = tacsatp_fishing |>  as.data.frame())
+  
+  tacsat_f_ICES_rect_coincidence = tacsatp_fishing |>  filter ( LE_RECT == LE_RECT_VMS) |>  dim ( ) 
+  
+  #VMS RECT == LOGBOOK RECT : 1046574             
+  
+  tacsat_f_ICES_rect_not_coincidence = tacsatp_fishing |>  filter ( LE_RECT != LE_RECT_VMS) |>  dim ( )
+  
+  tacsat_eflalo_ICES_R_report =  data.frame(ref = c ("VMS records with LB coincidence ICES R.",
+                                                     "VMS records with LB not coincidence ICES R.",
+                                                     "VMS Fishing records with LB coincidence ICES R.",
+                                                     "VMS Fishing records with LB not coincidence ICES R."), 
+                                            records = c( tacsat_ICES_rect_coincidence[1], 
+                                                         tacsat_ICES_rect_not_coincidence[1],
+                                                         tacsat_f_ICES_rect_coincidence[1], 
+                                                         tacsat_f_ICES_rect_not_coincidence[1])) |> 
+    add_row(ref = "propotion of coincidence / total" ,  
+            records =  round (( tacsat_ICES_rect_coincidence[1] / ( tacsat_ICES_rect_not_coincidence[1] + tacsat_ICES_rect_coincidence[1])  ), 2)   * 100    ) |> 
+    add_row(ref = "propotion of fishing coincidence / total" ,  
+            records =  round (( tacsat_f_ICES_rect_coincidence[1] / ( tacsat_f_ICES_rect_not_coincidence[1] + tacsat_f_ICES_rect_coincidence[1])  ), 2)   * 100    )
+  
+  
+  
+  save(
+    tacsat_eflalo_ICES_R_report,
+    file = file.path(outPath, paste0("qc1_tacsat_eflalo_ICES_R_report", year, ".RData"))
+  )
+  
+  
+  
+  
 }
+
+
+
+
+
+
+
   
   #QC2 END -------------------------------------------------------------------------------------------------------------
   
@@ -168,7 +205,7 @@ for(year in yearsToSubmit){
   
 
 ##########################################################
-###  SplitAmongPings2 ICES WG 2024
+###  SplitAmongPings2 ICES WG 2024   #####################
 ##############################################################
 
 yearsToSubmit = 2009:2023
@@ -311,7 +348,7 @@ save(
   
   
   ##########################################################
-  ###  SplitAmongPings 0.77
+  ###  SplitAmongPings 0.77   ##############################
   ##############################################################
   
   yearsToSubmit = 2009:2023
@@ -343,8 +380,7 @@ save(
   
   
   ## Join the TACSAT data with the speed array ranges to identify fishing VMS records ('f') and not fishing records ( steaming, 's')
-  
-  
+ 
   join_q = join_by(LE_L5MET, between ( SI_SP, min, max) )
   tacsatp = tacsatp |>  left_join( fishing_speed_met5_array  , by = join_q )
   
@@ -368,13 +404,13 @@ save(
   message(sprintf("%.2f%% of the eflalo data not in tacsat\n", (nrow(eflaloNM) / (nrow(eflaloNM) ))))
   
   
-  # Convert SI_STATE to binary (0/1) format
-  tacsatp$SI_STATE <- ifelse(tacsatp$SI_STATE == "f", 1, 0)
+ 
   
   # Filter rows where SI_STATE is 1
   # tacsatEflalo <- tacsatp[tacsatp$SI_STATE == 1,]
   
- 
+  # Convert SI_STATE to binary (0/1) format
+  tacsatp$SI_STATE <- ifelse(tacsatp$SI_STATE == "f", 1, 0)
   
   tacsatp <- tacsatp[tacsatp$SI_STATE == 1,]
   tacsatp <- tacsatp[!is.na(tacsatp$INTV),]
@@ -400,14 +436,17 @@ save(
       tacsat = tacsatp,
       eflalo = eflalo,
       variable = "all",
-      level = c("day","ICESrectangle","trip"),
+      level = c("day","ICESrectangle",  "trip"),
       conserve = TRUE, 
+      conserve_ML2 = TRUE, 
       by = "INTV"
     )
    
   
   tacsatEflalo = tacsatEflalo_0p77[[1]] 
   stats_splitamongpings = tacsatEflalo_0p77[[2]] |> mutate(year = year )
+  stats_vms_splitamongpings = tacsatEflalo_0p77[[3]] |> mutate(year = year )
+  
   
   save(
     tacsatEflalo ,
@@ -419,6 +458,12 @@ save(
   save(
     stats_splitamongpings ,
     file = file.path(outPath, paste0("tacsatEflalo_0p77_", year, "_summary_split_kg.RData"))
+  )
+  
+  
+  save(
+    stats_vms_splitamongpings ,
+    file = file.path(outPath, paste0("tacsatEflalo_0p77_", year, "_summary_split_vms.RData"))
   )
   
   
@@ -455,14 +500,6 @@ save(
   
   
   
-  
-  
-  
-  
-  
-  
-  
-  
 
   
   
@@ -471,7 +508,7 @@ save(
   
   
   ##########################################################
-  ###  SplitAmongPings 0.76
+  ###  SplitAmongPings 0.76     ############################
   ##############################################################
   
   yearsToSubmit = 2009:2023
@@ -602,11 +639,289 @@ save(
   
   
   
+  ##############################################################################################
   
   
+  
+  
+  
+  ##########################################################
+  ###  Grid to C-Square SAP077  #################################
+  ##############################################################
+  
+  yearsToSubmit = 2009:2023
+  
+  
+  year = 2023
+  
+  # Looping through the years to submit
+  for(year in yearsToSubmit){
+  
+   
+  load(file = paste0(outPath,paste0("/tacsatEflalo_0p77_", year, ".RData"))) 
+  
+    
+  # Calculate the c-square based on longitude and latitude
+  tacsatEflalo$Csquare <- CSquare(tacsatEflalo$SI_LONG, tacsatEflalo$SI_LATI, degrees = 0.05)
+  
+  table1_sap0p77 = tacsatEflalo 
+  
+  table1_sap0p77 |>  colnames()
+  
+  
+  ## Run this line ONLY to analyse the location with 0 landings aportioned by SAP0p77
+ ###  table1_sap0p77  = table1_sap0p77 |> filter ( LE_KG_TOT == 0 )
+  
+  table1_sap0p77  = table1_sap0p77 |>  mutate( kg_0 = ifelse ( LE_KG_TOT == 0, '0_kg_vms' , 'no0_kg_vms' ) )
+  
+  table1_agg_sap0p77 <- table1_sap0p77 %>%
+    # Separate LE_MET into met4 and met5, dropping extra pieces
+    separate(col = LE_MET, c("MetierL4", "MetierL5"), sep = '_', extra = "drop", remove = FALSE) %>%
+    # Group by several variables
+    group_by(SI_YEAR,  Csquare , MetierL4, MetierL5, kg_0) %>%
+    # Summarise the grouped data
+    summarise(
+      No_Records = n(),
+      AverageFishingSpeed = mean(SI_SP),
+      FishingHour = sum(INTV, na.rm = TRUE),
+      AverageInterval = mean(INTV, na.rm = TRUE),
+      AverageVesselLength = mean(VE_LEN, na.rm = TRUE),
+      AveragekW = mean(VE_KW, na.rm = TRUE),
+      TotWeight = sum(LE_KG_TOT, na.rm = TRUE),
+      TotValue = sum(LE_EURO_TOT, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    as.data.frame()
+  
+  
+  
+  table1_agg_sap0p77_coord  = table1_agg_sap0p77  |> 
+    cbind ( CSquare2LonLat(table1_agg_sap0p77$Csquare , 0.05) ) |> 
+    st_as_sf(coords = c( "SI_LONG", "SI_LATI"), remove = F) |> 
+    st_set_crs(value = 4326) |> 
+    filter( SI_LATI |> between ( 40, 70), SI_LONG |>  between ( -15, 20))  
+  
+  
+ 
+  
+  
+  
+  load(file = paste0(outPath,paste0("/tacsatEflalo_SAP2_", year, ".RData")))   
+  
+  
+  # Calculate the c-square based on longitude and latitude
+  tacsatEflalo$Csquare <- CSquare(tacsatEflalo$SI_LONG, tacsatEflalo$SI_LATI, degrees = 0.05)
+  
+  table1_sap2  = tacsatEflalo 
+  
+  table1_sap2 |>  colnames()
+  
+  table1_agg_sap2 <- table1_sap2 %>%
+    # Separate LE_MET into met4 and met5, dropping extra pieces
+    separate(col = LE_MET, c("MetierL4", "MetierL5"), sep = '_', extra = "drop", remove = FALSE) %>%
+    # Group by several variables
+    group_by(SI_YEAR,  Csquare , MetierL4, MetierL5) %>%
+    # Summarise the grouped data
+    summarise(
+      No_Records = n(),
+      AverageFishingSpeed = mean(SI_SP),
+      FishingHour = sum(INTV, na.rm = TRUE),
+      AverageInterval = mean(INTV, na.rm = TRUE),
+      AverageVesselLength = mean(VE_LEN, na.rm = TRUE),
+      AveragekW = mean(VE_KW, na.rm = TRUE),
+      TotWeight = sum(LE_KG_TOT, na.rm = TRUE),
+      TotValue = sum(LE_EURO_TOT, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    as.data.frame()
+  
+  
+  }
   
   
 
+  
+  
+  
+  
+  
+  
+  ### Join both tables to compare the reuslts of SAP functions 
+  
+  
+ table1_comparisons =  table1_agg_sap2 |> left_join(table1_agg_sap0p77, 
+                                                    by = join_by(SI_YEAR,  Csquare , MetierL4, MetierL5)  ) 
+  
+  
+ table1_comparisons |> colnames()
+ 
+ tabtable1_comparisons_diff   = table1_comparisons |> 
+   mutate( n_records_diff  = No_Records.x- No_Records.y , 
+           effort_h = FishingHour.x - FishingHour.y , 
+           le_kg_diff = round(TotWeight.x - TotWeight.y, 2)   )
+ 
+ tabtable1_comparisons_diff |>  
+   group_by(MetierL4, MetierL5) |>  
+   summarise(hours =  mean( effort_h ) ,kg = mean  ( abs ( le_kg_diff)), kg_max = max(le_kg_diff ) , kg_min = min(le_kg_diff )   )  |> 
+   arrange(desc( kg)) |> 
+   as.data.frame()  
+ 
+ 
+ 
+ 
+ 
+ tabtable1_comparisons_diff_coord  = tabtable1_comparisons_diff  |> 
+   cbind ( CSquare2LonLat(tabtable1_comparisons_diff$Csquare , 0.05) ) |> 
+   st_as_sf(coords = c( "SI_LONG", "SI_LATI"), remove = F) |> st_set_crs(value = 4326) |> 
+   filter( SI_LATI |> between ( 40, 70), SI_LONG |>  between ( -15, 20)) |> 
+   mutate ( le_kg_diff_class = cut(le_kg_diff, breaks =  seq ( from = -2000000, to = 1250000, by = 250000) ) ) 
+ 
+ tabtable1_comparisons_diff_coord |>  filter( le_kg_diff_class |>  is.na())
+ 
+ tabtable1_comparisons_diff_coord |> st_drop_geometry( ) |> 
+   ggplot() + geom_histogram(aes(log( le_kg_diff)) ) 
+ 
+ tabtable1_comparisons_diff_coord |> st_drop_geometry( ) |> 
+   ggplot() + geom_histogram(aes(n_records_diff) ) 
+ 
+ ggplot(tabtable1_comparisons_diff_coord  ) + 
+   geom_sf(aes( color = le_kg_diff_class), size = 0.5) + 
+   scale_color_discrete( ) + facet_wrap(~ le_kg_diff_class)
+ 
+ ?scale_color_discrete
+ 
+ tabtable1_comparisons_diff_coord |> distinct(SI_YEAR)
+ 
+
+ 
+ getwd() 
+ 
+ ### Get the data with no SAR for non mobile bottom contact gears
+ 
+ con = dbConnect(odbc::odbc(),      "geofish_dev" )
+ 
+ csquares = st_read( dsn =  con, 
+                     layer =  DBI::Id  ( schema = 'marine_statistical_grids' ,
+                                         table  = 'c_squares_all_pol_marine_fao_div_eez_ices_ospar_uk_regions') )  #,
+                     #query =  "select * from marine_statistical_grids.c_squares_all_pol_marine_fao_div limit 10 ")
+ 
+ 
+ ## Comparison between result of SAP2 and SAP0p77
+ 
+ csquares_an = csquares |>  filter( c_square  %in% tabtable1_comparisons_diff_coord$Csquare )
+ 
+ tabtable1_comparisons_diff_coord_cs = csquares_an |>  inner_join(tabtable1_comparisons_diff_coord |>  st_drop_geometry() , by = join_by(c_square == Csquare))
+ 
+ st_write(tabtable1_comparisons_diff_coord_cs, dsn = ".\\Results\\splitAmongPings_comparison\\maps_csquares\\splitamongpings_0p77_2_comparisons.gpkg", layer =  "sap2_vs_sap0p77_csquares_diff", append = FALSE)
+ 
+ 
+ ### SAP0p77 results to CSquares 
+ 
+ 
+ 
+ 
+ csquares_sap0p77 = csquares |>  filter( c_square  %in% table1_agg_sap0p77$Csquare )
+ 
+ table1_agg_sap0p77_diff_coord_cs = csquares_sap0p77 |>  inner_join(table1_agg_sap0p77_coord |>  st_drop_geometry() , by = join_by(c_square == Csquare))
+ 
+ 
+ table1_agg_sap0p77_diff_coord_cs |> st_drop_geometry() |>  distinct(uk_marine_zone )
+ table1_agg_sap0p77_diff_coord_cs |>  filter  (uk_marine_zone == 'England'  & TotWeight    )
+ 
+ st_write(table1_agg_sap0p77_diff_coord_cs, dsn = ".\\Results\\splitAmongPings_comparison\\maps_csquares\\splitamongpings_0p77_2_comparisons.gpkg", layer =  "table1_agg_sap0p77_diff_coord_cs", append = FALSE)
+ 
+ 
+ 
+ 
+ 
+ ### SAP0p77 results to CSquares - Difference between cels with VMS with effort by 0 kg
+ 
+ 
+ 
+ table1_agg_sap0p77pivot  =  table1_agg_sap0p77  |> 
+   pivot_wider(names_from = kg_0, values_from = - c ( SI_YEAR ,Csquare ,       MetierL4, MetierL5, kg_0  ) ,values_fill =  0    )
+ 
+ table1_agg_sap0p77pivot_diff_kg_0 = 
+   table1_agg_sap0p77pivot |> 
+   mutate ( vms_kg_vs_0_kg  = No_Records_no0_kg_vms   - No_Records_0_kg_vms  ,
+            hours_kg_vs_0_kg  = FishingHour_no0_kg_vms - FishingHour_0_kg_vms  ) |> 
+   mutate ( vms_kg_and_0_kg  = No_Records_no0_kg_vms  +  No_Records_0_kg_vms ,
+            hours_kg_and_0_kg  = FishingHour_no0_kg_vms +  FishingHour_0_kg_vms  ) |> 
+   filter (!is.na ( vms_kg_vs_0_kg)  ) 
+ 
+ table1_agg_sap0p77pivot_diff_kg_0_tot = 
+   table1_agg_sap0p77pivot_diff_kg_0|> 
+   group_by(SI_YEAR , Csquare , MetierL4  ) |> 
+   mutate(vms_no0_kg_vms = sum ( No_Records_no0_kg_vms, na.rm = T) ,
+          vms_0_kg_vms = sum ( No_Records_0_kg_vms, na.rm = T) ,
+          FishingHour_no0_kg_vms = sum ( FishingHour_no0_kg_vms, na.rm = T) , 
+          FishingHour_0_kg_vms = sum ( FishingHour_0_kg_vms, na.rm = T) ) |> 
+   reframe(vms_kg_vs_0_kg_tot = sum ( vms_kg_vs_0_kg, na.rm = T),
+             hours_kg_vs_0_kg_tot = sum(hours_kg_vs_0_kg, na.rm = T), 
+             vms_kg_and_0_kg_tot = sum ( vms_kg_and_0_kg, na.rm = T),
+             hours_kg_and_0_kg_tot = sum(hours_kg_and_0_kg, na.rm = T), 
+             vms_no0_kg_vms_prop = round ( ( vms_no0_kg_vms/vms_kg_and_0_kg_tot ) , 2)  ,
+             FishingHour_no0_kg_vms_prop = round ( ( FishingHour_no0_kg_vms/hours_kg_and_0_kg_tot ) , 2) 
+             )  |> 
+   as.data.frame()
+ 
+ summary(table1_agg_sap0p77pivot_diff_kg_0_tot)
+ table1_agg_sap0p77pivot_diff_kg_0_tot |>  filter ( vms_no0_kg_vms_prop  > 1)
+ 
+ ### save the general aggregated dataset product. No comaprison stats, etc
+ 
+ csquares_sap0p77 = csquares |> filter( c_square  %in% table1_agg_sap0p77pivot_diff_kg_0_tot$Csquare )
+ 
+ table1_agg_sap0p77_diff_coord_cs = csquares_sap0p77 |>  inner_join(table1_agg_sap0p77_coord |>  st_drop_geometry() , by = join_by(c_square == Csquare))
+ 
+ 
+ table1_agg_sap0p77_diff_coord_cs |> st_drop_geometry() |>  distinct(uk_marine_zone )
+ table1_agg_sap0p77_diff_coord_cs |>  filter  (uk_marine_zone == 'England'  & TotWeight    )
+ 
+ st_write(table1_agg_sap0p77_diff_coord_cs, dsn = ".\\Results\\splitAmongPings_comparison\\maps_csquares\\splitamongpings_0p77_2_comparisons.gpkg", layer =  "table1_agg_sap0p77_diff_coord_cs", append = FALSE)
+ 
+ 
+ ### save the general aggregated dataset product. No comparison stats, etc
+ 
+ 
+ csquares_sap0p77 = csquares |>  filter( c_square  %in% table1_agg_sap0p77$Csquare )
+ 
+ csquares_sap0p77 = csquares_sap0p77 |> distinct(c_square, uk_marine_zone, icesname , geom )
+ 
+ 
+ table1_agg_sap0p77_diff_coord_cs = csquares_sap0p77 |>  inner_join(table1_agg_sap0p77_coord |>  st_drop_geometry() , by = join_by(c_square == Csquare))
+ 
+ 
+ table1_agg_sap0p77_diff_coord_cs |> st_drop_geometry() |>  distinct(uk_marine_zone )
+ table1_agg_sap0p77_diff_coord_cs |>  filter  (uk_marine_zone == 'England'  & TotWeight    )
+ 
+ st_write(table1_agg_sap0p77_diff_coord_cs, dsn = ".\\Results\\splitAmongPings_comparison\\maps_csquares\\splitamongpings_0p77_2_comparisons.gpkg", layer =  "table1_agg_sap0p77_diff_coord_cs", append = FALSE)
+ 
+ 
+ ### save the general aggregated dataset product. comparison of effort and records with 0 kg allocated
+ 
+ csquares_sap0p77 = csquares |>  filter( c_square  %in% table1_agg_sap0p77$Csquare )
+ 
+ csquares_sap0p77 = csquares_sap0p77 |> distinct(c_square, uk_marine_zone, icesname , geom )
+ 
+ 
+ table1_agg_sap0p77_diff_kg_0_coord_cs = csquares_sap0p77 |> inner_join(table1_agg_sap0p77pivot_diff_kg_0_tot |>  st_drop_geometry() , by = join_by(c_square == Csquare))
+ 
+ summary ( table1_agg_sap0p77_diff_kg_0_coord_cs)
+ table1_agg_sap0p77_diff_kg_0_coord_cs |> st_drop_geometry() |>  distinct(uk_marine_zone )
+ table1_agg_sap0p77_diff_kg_0_coord_cs |>  filter  (uk_marine_zone == 'England'  & TotWeight    )
+ 
+ st_write(table1_agg_sap0p77_diff_kg_0_coord_cs, dsn = ".\\Results\\splitAmongPings_comparison\\maps_csquares\\splitamongpings_0p77_2_comparisons.gpkg", layer =  "table1_table1_agg_sap0p77_diff_kg_0_coord_cs", append = FALSE)
+ 
+ 
+ 
+ 
+ 
+ 
+##############################################################################################################################################
+  
+  
+ 
 
 
 #'------------------------------------------------------------------------------
