@@ -22,6 +22,8 @@ install.packages("devtools")
 ## Download and install the library required to interact with the ICES SharePoint site
 library(devtools)
 install.packages("icesSharePoint", repos = c('https://ices-tools-prod.r-universe.dev', 'https://cloud.r-project.org'))
+install.packages("sfdSAR", repos = "https://ices-tools-prod.r-universe.dev") ## do not install sfdSAR CRAN version, is obsolete
+install.packages("icesVMS", repos = 'https://ices-tools-prod.r-universe.dev')
 
 ## set ICES sharepoint username
 options(icesSharePoint.username = "your ices login name")  ## replace this text with your ICES sharepoint login name
@@ -46,6 +48,9 @@ pacman::p_load(vmstools, sf, data.table, raster, terra, mapview, Matrix, dplyr,
                doBy, mixtools, tidyr, glue, gt, progressr, geosphere, purrr, 
                ggplot2, sfdSAR, icesVocab, generics, icesConnect, icesVMS, icesSharePoint,
                tidyverse, units, tcltk, lubridate, here)
+
+
+ 
 
 # Set paths
 path <- paste0(getwd(), "/") # Working directory
@@ -105,12 +110,16 @@ if(!file.exists(paste0(dataPath, "hab_and_bathy_layers.zip"))){
   }
   
 # Load the bathymetry and habitat layers into R
+
 eusm <- readRDS(paste0(dataPath, "eusm.rds"))
 eusm <- eusm %>% st_transform(4326)
 bathy <- readRDS(paste0(dataPath, "ICES_GEBCO.rds"))
 bathy <- bathy %>% st_set_crs(4326)
 
-# Necessary setting for spatial operations
+# IMPORTANT: Necessary setting for spatial operations
+#' This function makes the st_intersect work properly. Otherwise the st_intersects function in BLOCK 2 would neve finish the task . 
+#' This function turns off the  spherical geometry , therefore the spatial function in SF are using the spatial layers projection instead
+
 sf::sf_use_s2(FALSE)
 
 
@@ -1062,112 +1071,149 @@ act.tac <- function (tacsat, units = "year", analyse.by = "LE_L5MET", storeSchem
 }
 
 
-# Define a function to assign tripnumber to Tacsat data
-trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", trust_logbook = T){
+
+
+# Function to assign LOGBOOK data for parameters with more than one value per trip
+#' For example , fishing trips using more than 1 gear or visiting more than 1 ICES RECTANGLE
+#' The function try: 
+#' 1) Match teh Logbook and VMS by the LE_CDAT and VMS date fields
+#' 2) ONLY IF YOU HAVE HAUL START and END dates: If still some TACSAT records with NA , it try to match by 
+#' start and end dates of the haul
+#' 3) If after step 1 and step2 still some remaining remaining TACSAT records with NULL values it choose
+#' the value with more related landings for that trip ( e.g. gear with more captures related)
+
+trip_assign <- function(tacsatp, eflalo, col = "LE_GEAR", haul_logbook = F){
+  
+  
   
   if(col == "LE_MET"){
     tst <- data.table(eflalo)[get(col) %in% valid_metiers & !is.na(get(col)) ,.(uniqueN(get(col))), by=.(FT_REF)]
   }else{
     tst <- data.table(eflalo)[!is.na(get(col)),.(uniqueN(get(col))), by=.(FT_REF)]
   }
+  
+  
   if(nrow(tst[V1>1])==0){
-    warning(paste("No duplicate", col, "in tacsatp"))
+    warning(paste("No more than one value for ", col, " in EFLALO trips"))
     return(data.frame())
   }
   
   e <- data.table(eflalo)[FT_REF %in% tst[V1>1]$FT_REF]
   
   tz <- data.table(tacsatp)[FT_REF  %in% tst[V1>1]$FT_REF]
-  suppressWarnings(tz[, (col) := NULL])
-  if(trust_logbook){
+  suppressWarnings(tz[, (col) := NULL])  
     
     ## First bind by landing date
+    
     e2 <- e[,.(get(col)[length(unique(get(col))) == 1]), by = .(FT_REF, LE_CDAT)]
     names(e2) <- c("FT_REF", "LE_CDAT", col)
     
     tz <- tz |> 
       left_join(e2, by = c("FT_REF" = "FT_REF", "SI_DATE" = "LE_CDAT"), relationship = "many-to-many")
     
-    tz <- unique(tz)
+    tz <- unique(tz)  #%>%  as.data.frame()
     
-    #If some are still missing, use haul information to get the closest time
-    if(nrow(tz[is.na(get(col))]) > 0){
-      #set formats right
-      e$FT_DDATIM <- as.POSIXct(paste(e$FT_DDAT, e$FT_DTIME, 
-                                      sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
-      e$FT_LDATIM <- as.POSIXct(paste(e$FT_LDAT, e$FT_LTIME, 
-                                      sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
+    if(haul_logbook){
+    
+          #If some are still missing, use haul information  ( LE_SDATIM , LE_EDATIM) to get the closest time
       
-      e$LE_SDATTIM <- as.POSIXct(paste(e$LE_SDAT, e$LE_STIME, 
-                                       sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
-      e$LE_EDATTIM <- as.POSIXct(paste(e$LE_EDAT, e$LE_ETIME, 
-                                       sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
+          if(nrow(tz[is.na(get(col))]) > 0){
       
-      tx <- tz[is.na(get(col))]
-      tx[, (col) := NULL]
+             if  ("LE_SDATTIM" %in% names(e)) {
       
-      mx <- rbind(e[,.(meantime = LE_SDATTIM), by = .(get(col), FT_REF)], e[,.(meantime = LE_EDATTIM), by = .(get(col), FT_REF)])
-      names(mx) <-  c(col, "FT_REF", "meantime")
+                str( e)
       
-      tx[, time := SI_DATIM]
+               if ( ! class(e$FT_DDATIM )[1] == "POSIXct" )  {
+                #set formats right
+                e$FT_DDATIM <- as.POSIXct(paste(e$FT_DDAT, e$FT_DTIME,
+                                                sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
+                e$FT_LDATIM <- as.POSIXct(paste(e$FT_LDAT, e$FT_LTIME,
+                                                sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
       
-      setkey(tx, FT_REF, time)
-      setkey(mx, FT_REF, meantime)
-      tx <- mx[tx, roll="nearest"]
-      tx$meantime <- NULL
-      tz <- rbindlist(list(tz[!is.na(get(col))], tx), fill = T)
+                e$LE_SDATTIM <- as.POSIXct(paste(e$LE_SDAT, e$LE_STIME,
+                                                 sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
+                e$LE_EDATTIM <- as.POSIXct(paste(e$LE_EDAT, e$LE_ETIME,
+                                                 sep = " "), tz = "GMT", format = "%d/%m/%Y  %H:%M")
+               }
+      
+                tx <- tz[is.na(get(col))]
+                tx[, (col) := NULL]
+      
+      
+      
+                 q1 = e[,.(meantime = LE_SDATTIM), by = .(get(col), FT_REF)]
+                 q2 = e[,.(meantime = LE_EDATTIM), by = .(get(col), FT_REF)]
+                  mx <- rbind(q1 ,q2 )
+                  names(mx) <-  c(col, "FT_REF", "meantime")
+                  setkey(mx, FT_REF, meantime)
+                  tx <- mx[tx, roll="nearest"]
+                  tx$meantime <- NULL
+      
+      
+      
+      
+                  tx[, time := SI_DATIM]
+      
+                  setkey(tx, FT_REF, time)
+      
+      
+                  tz <- rbindlist(list(tz[!is.na(get(col))], tx), fill = T)
+      
+             } else {
+               print("dataframe EFLALO  has no LE_SDATTIM column")
+      
+             }
+      
+        } # else{
+      
+         # tz[, (col) := NA]
+          
+          
+       #  }
+      
       
     }
-    
-  }else{
-    tz[, (col) := NA]
-  }
   
   # Bind to the category with most value
-  if(nrow(tz[is.na(get(col))]) > 0){
     
-    if(!"LE_KG_TOT" %in% names(e)){
-      idxkgeur <- colnames(e)[grepl("LE_KG_|LE_EURO_", colnames(e))]
+  if(nrow(  tz[is.na(get(col))] ) > 0){
+    
+    ft_ref_isna = tz %>%  filter ( is.na ( get(col))) %>%  distinct(FT_REF) %>% pull()
+     tz2 = tz %>%  filter ( FT_REF %in% ft_ref_isna ) %>%  as.data.frame()
+     e2 = e %>%  filter ( FT_REF %in% ft_ref_isna )
+    
+    
+    if(!"LE_KG_TOT" %in% names(e2)){
+      idxkgeur <- colnames(e2)[grepl("LE_KG_|LE_EURO_", colnames(e2))]
       # Calculate the total KG and EURO for each row
-      e$LE_KG_TOT <- rowSums(e[,..idxkgeur], na.rm = TRUE)
+      e2$LE_KG_TOT <- rowSums(e2[,..idxkgeur], na.rm = TRUE)
     }
     
-    highvalue <- e[,.(LE_KG_TOT = sum(LE_KG_TOT, na.rm = T)), by = .(FT_REF, get(col))]
+    highvalue <- e2[,.(LE_KG_TOT = sum(LE_KG_TOT, na.rm = T)), by = .(FT_REF, get(col))]
     highvalue <- highvalue[,.(get[which.max(LE_KG_TOT)]), by = .(FT_REF)]
     names(highvalue) <-  c("FT_REF", col)
     
-    tx <- tz[is.na(get(col))]
-    tx[, (col) := NULL]
-    tz <- merge(tx, highvalue)
+    tx2 <- tz2 
+    tx2 = tx2 %>%  select ( - any_of( col )  )
+    tz2 <- tx2 %>%  inner_join ( highvalue, by =  "FT_REF")
+    
   }
-  return(tz)
+      
+   tz =   tz %>%  filter(  !is.na ( get(col)))   
+   tz_all =  rbind (tz , tz2 )  
+   tz_all = tz_all |>  as.data.frame()
+   
+   return(tz_all) 
+  
 }
 
-predict_gear_width_mod <- function(model, coefficient, data) {
-  coeffs <- unique(coefficient)
-  coeffs <- coeffs[!is.na(coeffs)]
-  gear_widths <- icesVMS::get_benthis_parameters()
-  x <- rep(NA, nrow(data))
-  for (coeff in coeffs) {
-    cwhich <- which(coefficient == coeff)
-    x[cwhich] <- as.numeric(data[[coeff]][cwhich])
-  }
-  mods <- unique(model)
-  mods <- mods[!is.na(mods)]
-  output <- rep(NA, nrow(data))
-  for (mod in mods) {
-    fun <- match.fun(mod)
-    mwhich <- which(model == mod)
-    a_b <- gear_widths[gear_widths$gearModel == mod & gear_widths$gearCoefficient == coefficient[mwhich][1], c("firstFactor", "secondFactor")]
-    if (nrow(a_b) > 0) {
-      a <- as.numeric(a_b$firstFactor)
-      b <- as.numeric(a_b$secondFactor)
-      x_subset <- as.numeric(x[mwhich])
-      output[mwhich] <- fun(a, b, x_subset)
-    }
-  }
-  output
-}
+
+## add_gearwidth function calculates the gear width for each TACSAT record
+#' The calcualtion is benthis in BENTHIS model and it use the methods 
+#' included in ICES SFDSAR Package to predict the gear width from vessel length ( meters) or engine power (KW)
+#' add_gearwidth function also include a conditional statement to assign a default average gear width by metier
+#' from a auxiliary look up table.
+#' 
 
 add_gearwidth <- function(x, met_name = "LE_MET", oal_name = "VE_LEN", kw_name = "VE_KW"){
   
@@ -1175,6 +1221,8 @@ add_gearwidth <- function(x, met_name = "LE_MET", oal_name = "VE_LEN", kw_name =
   require(dplyr)
   require(sfdSAR)
   require(icesVMS)
+  
+ 
   
   setDT(x)
   
@@ -1187,11 +1235,7 @@ add_gearwidth <- function(x, met_name = "LE_MET", oal_name = "VE_LEN", kw_name =
   metier_lookup <- fread("https://raw.githubusercontent.com/ices-eg/RCGs/master/Metiers/Reference_lists/RDB_ISSG_Metier_list.csv")
   
   gear_widths <- get_benthis_parameters()
-  aux_lookup <- data.table(merge(gear_widths, metier_lookup, by.x = "benthisMet", by.y = "Benthis_metiers", all.y = T))
-  aux_lookup <- aux_lookup[,.(Metier_level6, benthisMet, avKw, avLoa, avFspeed, subsurfaceProp, gearWidth, firstFactor, secondFactor, gearModel,
-                              gearCoefficient, contactModel)]
-  aux_lookup <<- unique(aux_lookup)
-  
+ 
   aux_lookup <- data.table(merge(gear_widths, metier_lookup, by.x = "benthisMet", by.y = "Benthis_metiers", all.y = T))
   aux_lookup <- aux_lookup[,.(Metier_level6, benthisMet, avKw, avLoa, avFspeed, subsurfaceProp, gearWidth, firstFactor, secondFactor, gearModel,
                               gearCoefficient, contactModel)]
@@ -1199,23 +1243,26 @@ add_gearwidth <- function(x, met_name = "LE_MET", oal_name = "VE_LEN", kw_name =
   aux_lookup[gearCoefficient == "avg_oal", gearCoefficient := oal_name]
   aux_lookup <- unique(aux_lookup)
   
-  vms <- x |>
-    left_join(aux_lookup, by = "Metier_level6")
+  vms <- x |> left_join(aux_lookup, by = "Metier_level6")
   
   vms$gearWidth_model <- NA
   valid_gear_models <- !is.na(vms$gearModel) & !is.na(vms$gearCoefficient)
   vms$gearWidth_model[valid_gear_models] <-
-    predict_gear_width_mod(vms$gearModel[valid_gear_models], vms$gearCoefficient[valid_gear_models], vms[valid_gear_models, ])
+    predict_gear_width(vms$gearModel[valid_gear_models], vms$gearCoefficient[valid_gear_models], vms[valid_gear_models, ])
   
-  if("avg_gearWidth" %!in% names(vms))
-    vms[, avg_gearWidth := NA]
+  if("LE_GEARWIDTH" %!in% names(vms))
+    vms[, LE_GEARWIDTH := NA]
   
+  
+  ## THE MODEL GEAR WIDTH RESULT IS IN METERS , THE MODEL OUTPUT  DIVIDED BY 1000 to COVNERT IN KM 
+  ## This will match the default "gearwidth" value in BENTHIS Lookup table and also the rest 
+  ## of the workflow to calculate Swept Area in KM2
   
   gearWidth_filled <-
     with(vms,
-         ifelse(!is.na(avg_gearWidth), avg_gearWidth,
-                ifelse(!is.na(gearWidth_model), gearWidth_model,
-                       gearWidth)
+         ifelse( !is.na(LE_GEARWIDTH), LE_GEARWIDTH,  ### IF LE_GEARWIDTH is not NA uses LE_GEARWIDTH value provided by USER 
+                  ifelse(!is.na(gearWidth_model), gearWidth_model / 1000, ## ELSE WOULD CHECK IF gearwidth_model is not NA and will use model value and transform in KM 
+                          gearWidth)  #ELSE   use gearWIDTH default in BENTHIS lookuptable 
          ))
   
   gearWidth_filled[is.na(gearWidth_filled)] <- NA
